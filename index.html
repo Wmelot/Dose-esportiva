@@ -149,8 +149,7 @@ img.arte{object-fit:cover}
    linhas e máxima de 3, então 3 linhas não cortam ninguém e custam uma linha de espaço
    em branco na carta mediana. É o que o Magic faz, e o professor tinha razão: nenhuma
    informação se perde, e dá para comparar duas cartas sem abrir nenhuma. */
-.ct .tx{min-height:calc(3 * 1.38em)}
-.ct .pe{min-height:calc(2 * 1.5em);align-content:flex-start}
+.ct .pe{align-content:flex-start}
 /* A carta de ATLETA tortava por outro motivo: o selo da zona cabia ao lado do nome
    curto e quebrava para baixo do nome longo, desalinhando a linha toda. O nome agora
    encolhe e o selo nunca quebra. O bloco final (habilidade e passivo) também recebe
@@ -160,7 +159,7 @@ img.arte{object-fit:cover}
 .atl .topo > div:first-child{min-width:0;flex:1 1 auto}
 .atl .topo .zona{flex:0 0 auto;white-space:nowrap}
 .atl .nm{overflow-wrap:anywhere}
-.atl .habpas{min-height:calc(2 * 1.35em);margin-top:auto}
+.atl .habpas{margin-top:auto}
 .ct:hover:not(.no){border-color:var(--cyan)}
 .ct.no{opacity:.4;cursor:not-allowed}
 .ct.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
@@ -1361,8 +1360,45 @@ function renderFicha(){
   box.appendChild(sh);
 }
 
+/* ── ALTURA UNIFORME DAS CARTAS ──────────────────────────────────────────────
+   Reservar espaço por estimativa não funciona, e a primeira tentativa provou isso:
+   a largura da coluna muda com a tela e o texto quebra diferente em cada largura, de
+   modo que sempre sobra uma carta estourando a reserva. A única medida confiável é a
+   do próprio navegador, depois de desenhar.
+   Então: zera as alturas, mede a mais alta de cada grade e aplica em todas. A sobra
+   vira espaço em branco embaixo, como num baralho de verdade. Roda a cada desenho e
+   a cada mudança de tamanho de janela, porque o projetor e o celular têm larguras
+   diferentes e a conta muda nas duas. */
+function igualarCartas(){
+  /* Globalmente, não por grade: o catálogo tem três grades (programas, condutas,
+     contexto) e o elenco tem duas (atacantes, defensoras). Igualar dentro de cada uma
+     deixava as seções diferentes entre si, que é o mesmo problema um nível acima. */
+  for(const sel of ["#app .ct", "#app .atl"]){
+    const itens = [...document.querySelectorAll(sel)];
+    if(itens.length < 2) continue;
+    for(const c of itens) c.style.minHeight = "";
+    let alta = 0;
+    for(const c of itens) alta = Math.max(alta, c.getBoundingClientRect().height);
+    if(alta > 0) for(const c of itens) c.style.minHeight = Math.ceil(alta) + "px";
+  }
+}
+let reTimer = null;
+window.addEventListener("resize", ()=>{
+  clearTimeout(reTimer); reTimer = setTimeout(igualarCartas, 120);
+});
+
 /* ══════════════════════ DESPACHO DE TELA ══════════════════════ */
+/* render = desenhar e DEPOIS igualar, nessa ordem e de forma síncrona.
+   A primeira versão agendava a igualação para o próximo quadro de animação, o que
+   parecia mais elegante e não funcionava: o agendamento não dispara de forma
+   confiável em toda situação, e o resultado era carta de tamanho diferente em parte
+   das vezes — defeito intermitente, que é o pior tipo. Chamada direta não tem esse
+   problema, e medir 41 cartas uma vez por tela não custa nada. */
 function render(){
+  desenharTela();
+  igualarCartas();
+}
+function desenharTela(){
   const app = $("#app"); app.textContent = "";
   renderHud();
   if(VENDO_CATALOGO || VENDO_REGRAS || VENDO_PAINEL || VENDO_GLOSSARIO){
