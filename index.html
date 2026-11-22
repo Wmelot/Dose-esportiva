@@ -40,6 +40,13 @@ h3{font-size:16px;font-weight:600}
    quase invisível, escurecendo tudo e engolindo todo clique. O jogo ficou inutilizável
    no navegador sem que nenhum teste percebesse, porque nenhum teste renderizava CSS. */
 [hidden]{display:none!important}
+.legenda{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;font-size:11.5px;
+  color:var(--dim);border-left:2px solid var(--line);padding:7px 0 7px 11px;margin:2px 0}
+.legenda .lbl{width:100%;margin-bottom:1px}
+.legenda b{color:var(--fg);font-weight:600}
+.legenda button{padding:1px 8px;font-size:11px}
+.glos h3{color:var(--cyan)}
+.glos p{font-size:13px;line-height:1.5}
 .num{font-family:var(--num);font-variant-numeric:tabular-nums}
 .pse{color:var(--dim)}
 .pse .psev{color:var(--cyan);font-weight:700}
@@ -810,6 +817,104 @@ function arteAtleta(a){
    decimal se compra com Teste funcional ou Scouting. É o que mantém de pé as cartas
    de informação, e o que faz a Invasão na linha central valer um scout. */
 let S = null;
+/* ══════════════════════ GLOSSÁRIO ══════════════════════
+   Todo termo técnico que o jogo usa, com a aula de onde ele vem. Existe porque o jogo
+   é material de disciplina: o aluno que não sabe o que é "p.p." não está tendo
+   dificuldade com o jogo, está tendo dificuldade com a matéria — e são coisas
+   diferentes, que precisam de socorro diferente.
+   `curto` é a legenda de uma linha que aparece na própria tela de treino.
+   `longo` é a explicação da tela de glossário. */
+const GLOSSARIO = [
+ {t:"p.p.", curto:"pontos percentuais", aula:"02",
+  longo:"Ponto percentual é a diferença entre duas porcentagens. Um risco que vai de "
+   +"10% para 18% subiu 8 PONTOS PERCENTUAIS — e não 8%, nem 80%. A distinção não é "
+   +"preciosismo: é ela que separa 'o risco dobrou' de 'o risco subiu 8 pontos', e os "
+   +"dois lidos como a mesma coisa é um dos erros mais comuns ao relatar epidemiologia."},
+ {t:"atributo", curto:"o número grande da atleta — ataque ou defesa", aula:"04",
+  longo:"O número grande na carta da atleta. Para quem ataca, é a demanda que ela "
+   +"impõe; para quem defende, a capacidade que ela oferece. Programas somam, fadiga "
+   +"e lesão subtraem. É o que entra no duelo."},
+ {t:"carga aguda", curto:"soma das 2 últimas rodadas", aula:"04",
+  longo:"A soma da carga das 2 últimas rodadas. É o esforço recente, o que o corpo "
+   +"ainda está digerindo. Sozinha não diz nada: só vale comparada com a crônica."},
+ {t:"carga crônica", curto:"média das 6 últimas rodadas", aula:"04",
+  longo:"A média móvel das 6 últimas rodadas. É o que o corpo já está adaptado a "
+   +"aguentar — o preparo acumulado. Demora a subir e demora a cair."},
+ {t:"razão", curto:"aguda ÷ crônica", aula:"04",
+  longo:"Carga aguda dividida pela carga crônica — a razão aguda:crônica (ACWR). "
+   +"Perto de 1,00 significa que o esforço recente está no tamanho do preparo. "
+   +"Muito acima: subiu rápido demais. Muito abaixo: destreinou."},
+ {t:"crônica inicial", curto:"a carga a que ela já está adaptada", aula:"06",
+  longo:"Com quanto de carga a atleta já chega adaptada. É o atributo que define a "
+   +"MARGEM dela: quem tem crônica alta precisa de bastante treino para não destreinar; "
+   +"quem tem crônica baixa estoura com pouco. É individualidade biológica em número."},
+ {t:"dose certa", curto:"razão entre 0,80 e 1,25 — a faixa de risco baixo", aula:"04",
+  longo:"A faixa em que o risco é mais baixo, aproximadamente entre 0,80 e 1,25 de "
+   +"razão. É o fundo da curva em U: as duas pontas machucam, e o meio é onde você "
+   +"quer todo mundo no dia de jogo."},
+ {t:"sobrecarga", curto:"razão acima de 1,45 — subiu rápido demais", aula:"04",
+  longo:"Razão acima de 1,45. O esforço recente passou muito do que o corpo está "
+   +"preparado para absorver. Não garante lesão — aumenta a probabilidade dela."},
+ {t:"destreinada", curto:"razão abaixo de 0,80 — treinou de menos", aula:"06",
+  longo:"Razão abaixo de 0,80. Treinou de menos e perdeu preparo — reversibilidade. "
+   +"Machuca tanto quanto o excesso, e é o erro que passa despercebido porque não "
+   +"parece erro: ninguém reclama de atleta descansada."},
+ {t:"fadiga", curto:"desconto no atributo de quem está acima da faixa", aula:"06",
+  longo:"Quando a razão passa de 1,20, a atleta começa a render menos: o atributo cai. "
+   +"É a outra metade do preço do excesso — além de arriscar lesão, você joga pior."},
+ {t:"carga interna", curto:"o que o treino CUSTOU à atleta", aula:"04",
+  longo:"A resposta biológica ao treino: o que ele custou àquela atleta. Diferente da "
+   +"carga externa, que é o que você PRESCREVEU. A mesma sessão custa diferente para "
+   +"cada uma, e muda com sono, viagem e lesão recente."},
+ {t:"PSE", curto:"percepção subjetiva de esforço — mede a carga interna", aula:"04",
+  longo:"Percepção Subjetiva de Esforço, a escala de Borg. PSE × minutos de sessão dá "
+   +"a carga em unidades arbitrárias. É barata, universal e integra o físico e o "
+   +"psicológico — por isso é a medida de carga interna mais usada no mundo real. "
+   +"No jogo, colher a PSE custa 1 de energia e revela quanto cada atleta pagou."},
+ {t:"manutenção", curto:"1 ⚡ a cada 3 programas instalados", aula:"06",
+  longo:"Programa instalado cobra energia toda rodada: 1 a cada 3 programas no elenco. "
+   +"Instalar mais do que você consegue manter faz o programa cair e o ganho se perder. "
+   +"É o princípio da continuidade cobrando o preço dele."},
+ {t:"alcance X", curto:"você escolhe quantas atletas, e o preço sobe a cada uma", aula:"07",
+  longo:"Carta cujo custo depende de quantas atletas você escolhe: X é o número de "
+   +"beneficiadas. Deixa a mesma carta servir para uma atleta ou para meio elenco, e "
+   +"faz o alcance ter preço — que é como funciona hora de equipe na vida real."},
+ {t:"demanda", curto:"o que o ataque exige de quem defende", aula:"04",
+  longo:"O que o gesto exige de quem está do outro lado. Metade da equação da lesão: "
+   +"capacidade × demanda. Quando a demanda passa da capacidade, o tecido é quem paga."},
+ {t:"capacidade", curto:"o que a defensora consegue sustentar", aula:"04",
+  longo:"O que a atleta consegue gerar, transferir e dissipar. A outra metade da "
+   +"equação. Lesão não é carga alta em absoluto: é carga alta PARA AQUELA atleta."},
+ {t:"improviso", curto:"escalar fora da função — custa atributo e risco", aula:"13",
+  longo:"Escalar a atleta numa posição que pede outra função. O tecido dela não está "
+   +"condicionado para aquele gesto, então ela rende menos e arrisca mais. É capacidade "
+   +"× demanda no nível do gesto esportivo."},
+ {t:"energia", curto:"6 por rodada, não acumula", aula:"07",
+  longo:"Quanto trabalho a comissão técnica consegue fazer naquela rodada: 6, menos a "
+   +"manutenção. O que sobrar se perde. É hora de equipe, que não se estoca."},
+ {t:"verba", curto:"12 na pré-temporada, compra estrutura", aula:"07",
+  longo:"Só existe na pré-temporada e compra ESTRUTURA, não jogadoras: os programas "
+   +"iniciais. É a decisão real do fisioterapeuta, que não escolhe o elenco e sim onde "
+   +"gastar as horas que tem."},
+];
+const GLOS = Object.fromEntries(GLOSSARIO.map(g=>[g.t,g]));
+/* uma linha de legenda com os termos que importam NAQUELA tela */
+function legenda(termos){
+  const w = el("div","legenda");
+  w.appendChild(el("span","lbl","o que significa"));
+  termos.filter(t=>GLOS[t]).forEach((t,i)=>{
+    const s2 = el("span","");
+    s2.appendChild(el("b","", t));
+    s2.appendChild(document.createTextNode(" " + GLOS[t].curto));
+    w.appendChild(s2);
+  });
+  const b = el("button","ghost","glossário");
+  b.onclick = ()=>{ VENDO_GLOSSARIO = true; render(); };
+  w.appendChild(b);
+  return w;
+}
+
+let VENDO_GLOSSARIO = false;
 let VENDO_CATALOGO = false;
 let VENDO_REGRAS = false;
 let VENDO_PAINEL = false;
@@ -873,6 +978,11 @@ function renderHud(){
   br.style.padding="3px 10px"; br.style.fontSize="12px";
   br.onclick = ()=>{ VENDO_REGRAS = true; render(); };
   d.appendChild(br);
+  const bg = el("button","ghost","Termos");
+  bg.style.padding="3px 10px"; bg.style.fontSize="12px";
+  bg.title = "Glossário: o que significa cada termo e de que aula ele vem";
+  bg.onclick = ()=>{ VENDO_GLOSSARIO = true; render(); };
+  d.appendChild(bg);
   const b = el("button","ghost","Cartas");
   b.style.padding="3px 10px"; b.style.fontSize="12px";
   b.onclick = ()=>{ VENDO_CATALOGO = true; render(); };
@@ -1234,9 +1344,10 @@ function renderFicha(){
 function render(){
   const app = $("#app"); app.textContent = "";
   renderHud();
-  if(VENDO_CATALOGO || VENDO_REGRAS || VENDO_PAINEL){
+  if(VENDO_CATALOGO || VENDO_REGRAS || VENDO_PAINEL || VENDO_GLOSSARIO){
     $("#guia").hidden = true; $("#ficha").hidden = true;
     if(VENDO_PAINEL) return telaPainel(app);
+    if(VENDO_GLOSSARIO) return telaGlossario(app);
     return VENDO_REGRAS ? telaRegras(app) : telaCatalogo(app);
   }
   barraGuia(S ? S.fase : null);
@@ -1314,6 +1425,10 @@ function telaIntro(app){
   b4.title = "Para quem está conduzindo a aula: junta os resultados das mesas";
   b4.onclick = ()=>{ VENDO_PAINEL = true; render(); };
   r2.appendChild(b4);
+  const b5 = el("button","ghost","Glossário");
+  b5.title = "O que significa cada termo técnico, e de que aula ele vem";
+  b5.onclick = ()=>{ VENDO_GLOSSARIO = true; render(); };
+  r2.appendChild(b5);
   const b2 = el("button","ghost","Ver as "+TOTAL_CARTAS+" cartas");
   b2.onclick = ()=>{ VENDO_CATALOGO = true; render(); };
   r2.appendChild(b2);
@@ -1333,6 +1448,7 @@ function telaPreTemporada(app){
   av.textContent = "Instale programas nas atletas que você pretende usar. Verba não cobre as doze — "
     + "quem fica sem programa não recebe carga, e quem não recebe carga chega destreinada ao jogo.";
   w.appendChild(av);
+  w.appendChild(legenda(["verba","crônica inicial","destreinada","manutenção","alcance X"]));
 
   const st = el("div","saldo");
   const b1 = el("div","b");
@@ -1722,6 +1838,7 @@ function telaTreino(app){
   st.appendChild(el("div","obs","Energia NÃO acumula: o que sobrar nesta rodada se perde. "
     + "Toda atleta recebe "+CARGA_COLETIVA+" de carga do treino coletivo mesmo sem carta nenhuma."));
   w.appendChild(st);
+  w.appendChild(legenda(["razão","dose certa","p.p.","atributo","energia","manutenção"]));
   w.appendChild(caixaPSE(j));
 
   if(j.mao.length > LIMITE_MAO){
@@ -1976,6 +2093,7 @@ function telaEscalacao(app){
   if(!j.quadra) j.quadra = {};
   const w = el("div","stack");
   w.appendChild(el("h2","","Escalação secreta · "+j.nome+" · "+rodadaAtual().r));
+  w.appendChild(legenda(["improviso","atributo","fadiga","dose certa"]));
 
   w.appendChild(mapaQuadra(j, {slotSel:S.slotSel, clic:(sid)=>{
     if(j.quadra[sid]){ delete j.quadra[sid]; S.slotSel = null; }
@@ -2116,6 +2234,7 @@ function telaDuelos(app){
   const w = el("div","stack");
   const d = S.duelos[S.di];
   w.appendChild(el("h2","","Duelo "+(S.di+1)+" de 6 · "+rodadaAtual().r));
+  w.appendChild(legenda(["demanda","capacidade","p.p."]));
 
   const dem = demanda(d), cap = capacidade(d);
   const pp = pPonto(dem, cap);
@@ -2866,13 +2985,41 @@ function telaPainel(app){
 /* ══════════════════════ TELA · REGRAS ══════════════════════
    O manual inteiro numa tela, com os números vindos das constantes — assim ele não
    envelhece quando o equilíbrio mudar. */
+function telaGlossario(app){
+  const w = el("div","stack"); w.style.paddingTop="18px";
+  const topo = el("div","row"); topo.style.justifyContent="space-between";
+  const tt = el("div");
+  tt.appendChild(el("h1","","Glossário"));
+  tt.appendChild(el("p","dim","Os termos que o jogo usa, e de que aula da disciplina "
+    + "cada um vem. Se um termo te travou, o problema não é o jogo."));
+  topo.appendChild(tt);
+  const bv = el("button","pri", S ? "Voltar à partida" : "Voltar");
+  bv.onclick = ()=>{ VENDO_GLOSSARIO=false; render(); };
+  topo.appendChild(bv);
+  w.appendChild(topo);
+  for(const g of GLOSSARIO){
+    const c = el("div","card stack glos");
+    const lin = el("div","row"); lin.style.justifyContent="space-between";
+    const esq = el("div");
+    esq.appendChild(el("h3","", g.t));
+    esq.appendChild(el("div","lbl", g.curto));
+    lin.appendChild(esq);
+    lin.appendChild(el("span","pill faint","aula " + g.aula));
+    c.appendChild(lin);
+    c.appendChild(el("p","", g.longo));
+    w.appendChild(c);
+  }
+  app.appendChild(w);
+}
+
 function telaRegras(app){
   const w = el("div","stack"); w.style.paddingTop="18px";
   const topo = el("div","row"); topo.style.justifyContent="space-between";
   const tt = el("div");
   tt.appendChild(el("h1","","Regras"));
   tt.appendChild(el("p","dim","Dá para jogar sem ler: a faixa azul no topo de cada tela diz o que fazer. "
-    + "Isto aqui é para quando você quiser entender por quê."));
+    + "Isto aqui é para quando você quiser entender por quê. "
+    + "Para o significado de um termo solto, veja o Glossário."));
   topo.appendChild(tt);
   const bv = el("button","pri", S ? "Voltar à partida" : "Voltar");
   bv.onclick = ()=>{ VENDO_REGRAS=false; render(); };
@@ -3022,7 +3169,8 @@ function telaCatalogo(app){
   const bb = el("button","pri", S ? "Voltar à partida" : "Voltar");
   bb.onclick = ()=>{ VENDO_CATALOGO=false; render(); };
   top.appendChild(bb);
-  w.appendChild(top);
+  const legC = legenda(["p.p.","atributo","razão","carga aguda","carga crônica","PSE","alcance X"]);
+  w.appendChild(top); w.appendChild(legC);
 
   const leg = el("div","grid3");
   [["O número grande","É o atributo em jogo: ataque nas atacantes, defesa nas defensoras. Já desconta fadiga e lesão."],
