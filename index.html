@@ -140,6 +140,27 @@ img.arte{object-fit:cover}
 .mao{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:9px}
 .ct{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:10px;min-width:0;
   display:flex;flex-direction:column;gap:5px;cursor:pointer;position:relative;text-align:left;font-size:13px}
+/* ALTURA UNIFORME, como num baralho de verdade. Não dá para fazer isso com altura fixa
+   em pixels, porque a arte é proporcional à largura da coluna e a coluna é elástica.
+   A solução é reservar espaço pelos dois blocos que variam — o texto e o rodapé — com
+   altura mínima em LINHAS. Como todo o resto da carta (arte, tipo, nome) já tem altura
+   determinada, todas acabam idênticas em qualquer largura.
+   Os números saíram de medição, não de chute: o texto das 29 cartas tem mediana de 2
+   linhas e máxima de 3, então 3 linhas não cortam ninguém e custam uma linha de espaço
+   em branco na carta mediana. É o que o Magic faz, e o professor tinha razão: nenhuma
+   informação se perde, e dá para comparar duas cartas sem abrir nenhuma. */
+.ct .tx{min-height:calc(3 * 1.38em)}
+.ct .pe{min-height:calc(2 * 1.5em);align-content:flex-start}
+/* A carta de ATLETA tortava por outro motivo: o selo da zona cabia ao lado do nome
+   curto e quebrava para baixo do nome longo, desalinhando a linha toda. O nome agora
+   encolhe e o selo nunca quebra. O bloco final (habilidade e passivo) também recebe
+   altura mínima, porque quem não tem habilidade tinha a carta mais baixa. */
+.atl{display:flex;flex-direction:column}
+.atl .topo{flex-wrap:nowrap;align-items:flex-start}
+.atl .topo > div:first-child{min-width:0;flex:1 1 auto}
+.atl .topo .zona{flex:0 0 auto;white-space:nowrap}
+.atl .nm{overflow-wrap:anywhere}
+.atl .habpas{min-height:calc(2 * 1.35em);margin-top:auto}
 .ct:hover:not(.no){border-color:var(--cyan)}
 .ct.no{opacity:.4;cursor:not-allowed}
 .ct.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
@@ -375,7 +396,7 @@ const ACOES = [
     entorse lateral de tornozelo na modalidade, e quem causa é mesmo a adversária —
     então a interação continua existindo, agora com o gesto certo. */
  {id:"invasao", t:"CONDUTA", nm:"Invasão na linha central", custo:3, cop:1, alvo:"atletaAdv", quando:"jogo",
-  tx:"Só contra quem está na REDE. Entorse de tornozelo: 1 de lesão sempre. +1 se ela estiver em sobrecarga; −1 se tiver propriocepção ou bandagem. É falta: o ponto do duelo vai para ela."},
+  tx:"Só contra quem está na REDE. Entorse: 1 de lesão, +1 em sobrecarga, −1 com propriocepção ou bandagem. É falta."},
 
  /* ── 6 CONTEXTO */
  {id:"coletivo", t:"CONTEXTO", nm:"Treino coletivo", custo:2, cop:2, alvo:"todas", quando:"treino",
@@ -998,7 +1019,7 @@ function cartaAtleta(a, o){
   if(o.clic){ w.classList.add("clic"); w.tabIndex=0; w.onclick=o.clic;
     w.onkeydown=(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); o.clic(); } }; }
   if(o.arte !== false) w.appendChild(arteAtleta(a));
-  const top = el("div","row"); top.style.justifyContent="space-between"; top.style.gap="6px";
+  const top = el("div","row topo"); top.style.justifyContent="space-between"; top.style.gap="6px";
   const nn = el("div");
   nn.appendChild(el("div","nm",a.nm));
   nn.appendChild(el("div","pos",a.fn+" · "+a.pos));
@@ -1074,8 +1095,8 @@ function cartaAtleta(a, o){
     i.onclick = (e)=>{ e.stopPropagation(); e.preventDefault(); abrirFicha("atleta", a.id); };
     w.appendChild(i);
   }
-  if(o.hab && (a.hab!=="—" || a.pas!=="—")){
-    const t = el("div"); t.style.marginTop="7px"; t.style.fontSize="11.5px";
+  if(o.hab){
+    const t = el("div","habpas"); t.style.marginTop="7px"; t.style.fontSize="11.5px";
     if(a.hab!=="—"){ const x=el("div","",a.hab); x.style.color="var(--verde)"; t.appendChild(x); }
     if(a.pas!=="—"){ const y=el("div","",a.pas); y.style.color="var(--ambar)"; t.appendChild(y); }
     w.appendChild(t);
@@ -1096,7 +1117,7 @@ function cartaAcao(id, o){
   w.appendChild(el("div","tp", c.t));
   w.appendChild(el("div","nm", c.nm));
   w.appendChild(el("div","tx", c.tx));
-  const pe = el("div","row"); pe.style.gap="7px"; pe.style.marginTop="auto";
+  const pe = el("div","row pe"); pe.style.gap="7px"; pe.style.marginTop="auto";
   if(c.cg) pe.appendChild(el("span","cg","+"+c.cg+" de carga por rodada"));
   if(c.t==="PROGRAMA") pe.appendChild(el("span","num faint","· fica em jogo"));
   if(c.alvo==="x")     pe.appendChild(el("span","num","alcance X"));
