@@ -1,0 +1,3088 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<style>html{-webkit-text-size-adjust:100%}body{margin:0}</style>
+</head>
+<body>
+<title>DOSE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* DOSE. Elenco idêntico dos dois lados, mercado de cartas virado para
+   cima, recuperação que reduz carga aguda com piso em razão 1,00.
+   Tema único escuro, deliberado — o jogo é projetado em sala e lido de longe.
+   Informação aberta, exceto a escalação: o mercado virado já revela as mãos. */
+:root{
+  --bg:#0A1018; --panel:#111A24; --panel2:#17222E; --line:#24323F;
+  --fg:#E8EEF4; --dim:#8FA3B4; --faint:#5C7083;
+  --cyan:#3BC9DB; --verde:#2FB380; --ambar:#E0A030; --vermelho:#E05252; --roxo:#9B7BD4;
+  --atq:#F0803C; --def:#4A9BE0; --rosa:#FF6FB5;
+  --disp:"Barlow Condensed",Impact,sans-serif;
+  --corpo:"Inter",system-ui,sans-serif;
+  --num:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--corpo);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 40px;max-width:1180px;margin:0 auto}
+h1,h2,h3,.disp{font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;margin:0;text-wrap:balance}
+h1{font-size:clamp(34px,8vw,58px);line-height:.92;font-weight:700}
+h2{font-size:clamp(20px,3.4vw,27px);font-weight:600}
+h3{font-size:16px;font-weight:600}
+/* Isto precisa vir antes de qualquer regra que declare display.
+   Regra de autor vence a regra do navegador, então um `display:` escrito aqui ANULA o
+   atributo hidden do HTML. Foi exatamente o que aconteceu com #ficha, que tem
+   display:flex: a camada escura da ficha ficava permanentemente por cima da tela,
+   quase invisível, escurecendo tudo e engolindo todo clique. O jogo ficou inutilizável
+   no navegador sem que nenhum teste percebesse, porque nenhum teste renderizava CSS. */
+[hidden]{display:none!important}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+.pse{color:var(--dim)}
+.pse .psev{color:var(--cyan);font-weight:700}
+.pse .pseq{color:var(--faint);font-weight:700;letter-spacing:.5px}
+.pseBox{border-left:3px solid var(--cyan)}
+.pseBox p{font-size:12.5px;line-height:1.45;margin:0}
+.dim{color:var(--dim)}.faint{color:var(--faint)}
+p{margin:0}
+button{font-family:var(--corpo);font-size:14px;cursor:pointer;border-radius:4px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--fg);padding:9px 16px;transition:border-color .12s,background .12s}
+button:hover:not(:disabled){border-color:var(--cyan)}
+button:disabled{opacity:.34;cursor:not-allowed}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.pri{background:var(--cyan);color:#071016;border-color:var(--cyan);font-weight:600}
+.pri:hover:not(:disabled){background:#5FD8E8}
+.danger{border-color:#5A2B2B;color:#F0A0A0}
+.ghost{background:transparent}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;min-width:0}
+.lbl{font-family:var(--disp);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint)}
+
+/* faixa de estado */
+#hud{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);
+  border-bottom:1px solid var(--line);padding-block:10px;margin-bottom:16px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:11;background:var(--bg)}
+#hud .row{justify-content:space-between;gap:14px}
+.tl{display:flex;gap:3px;align-items:flex-end}
+.tl i{display:block;width:26px;height:16px;border:1px solid var(--line);border-radius:2px;background:var(--panel);
+  font-family:var(--disp);font-size:10px;line-height:14px;text-align:center;color:var(--faint);font-style:normal}
+.tl i.jogo{background:var(--panel2);border-color:#3A4A5A;color:var(--dim)}
+.tl i.feita{background:#1E3A32;border-color:var(--verde);color:var(--verde)}
+.tl i.atual{background:var(--cyan);border-color:var(--cyan);color:#071016;font-weight:700}
+.pill{font-family:var(--num);font-size:12px;border:1px solid var(--line);border-radius:3px;padding:3px 8px;background:var(--panel)}
+.saldo{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--panel);
+  border:1px solid var(--cyan);border-radius:6px;padding:11px 14px}
+.saldo .b{display:flex;flex-direction:column;gap:1px}
+.saldo .v{font-family:var(--num);font-size:27px;font-weight:700;line-height:1;color:var(--cyan)}
+.saldo .v.zero{color:var(--vermelho)}
+.saldo .s{font-family:var(--num);font-size:17px;font-weight:700;line-height:1}
+.saldo .obs{font-size:11.5px;color:var(--dim);max-width:280px;line-height:1.3}
+.ct .cst{top:6px;right:32px;font-size:17px;padding:1px 6px;border:1px solid var(--cyan);border-radius:4px}
+.ct.no .cst{border-color:var(--line);color:var(--faint)}
+.lesao{font-family:var(--num);font-size:10.5px;padding:2px 6px;border-radius:3px;margin-top:6px;
+  display:inline-block;background:#3A1A1A;color:#F08080;border:1px solid #6B2E2E}
+
+/* atletas */
+.elenco{display:grid;grid-template-columns:repeat(auto-fill,minmax(188px,1fr));gap:10px}
+.atl{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:5px;padding:10px;min-width:0}
+.atl.ATQ{border-left-color:var(--atq)}.atl.DEF{border-left-color:var(--def)}
+.atl.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
+.atl.fora{opacity:.42}
+.atl.clic{cursor:pointer}
+.atl.clic:hover{border-color:var(--cyan)}
+.atl .nm{font-family:var(--disp);font-size:17px;font-weight:600;line-height:1.1}
+.atl .pos{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-family:var(--disp)}
+.atl .big{font-family:var(--num);font-size:25px;font-weight:700;line-height:1}
+.atl .meta{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;margin-top:7px}
+.zona{font-family:var(--num);font-size:11px;padding:2px 6px;border-radius:3px;white-space:nowrap}
+/* prévia: o que acontece SE você aplicar a carta nesta atleta.
+   Moldura rosa porque é previsão e não estado; o número dentro é colorido pela zona
+   que vai resultar, para dizer de uma vez "isto é um palpite" e "o palpite é bom". */
+.prev{margin-top:7px;border:1px solid var(--rosa);border-radius:4px;padding:5px 7px;background:#2A1322}
+.prev .cab{font-family:var(--disp);font-size:9px;letter-spacing:.12em;color:var(--rosa);display:block;margin-bottom:2px}
+.prev .v{font-family:var(--num);font-size:11.5px;line-height:1.4;display:block}
+.prev .nada{color:var(--faint);font-style:italic}
+.prev .bom{color:#4ED8A0}.prev .meio{color:#F0B850}.prev .ruim{color:#F08080}
+.proj{font-family:var(--num);font-size:11px;margin-top:6px;padding:3px 6px;border-radius:3px;
+  border:1px dashed var(--line);color:var(--dim);background:transparent}
+.proj.alerta{border-style:solid;font-weight:700}
+.proj.z-verde{color:#4ED8A0;border-color:#2A6B55}
+.proj.z-ambar{color:#F0B850;border-color:#6B5320}
+.proj.z-vermelho{color:#F08080;border-color:#6B2E2E;background:#2A1414}
+.z-verde{background:#17352C;color:#4ED8A0;border:1px solid #2A6B55}
+.z-ambar{background:#3A2C13;color:#F0B850;border:1px solid #6B5320}
+.z-vermelho{background:#3A1A1A;color:#F08080;border:1px solid #6B2E2E}
+.z-oculta{background:var(--panel2);color:var(--faint);border:1px solid var(--line)}
+.progs{display:flex;flex-wrap:wrap;gap:3px;margin-top:7px}
+.progs span{font-size:10px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:1px 5px;color:var(--dim)}
+.lesbar{display:flex;gap:2px;margin-top:6px}
+.lesbar b{display:block;width:13px;height:5px;border-radius:1px;background:var(--line)}
+.lesbar b.on{background:var(--vermelho)}
+
+/* arte vetorial das cartas */
+.arte{display:block;width:100%;height:auto;aspect-ratio:3/2;background:#0C141D;border:1px solid var(--line);border-radius:4px}
+img.arte{object-fit:cover}
+.atl .arte{margin-bottom:8px}
+.ct .arte{margin-bottom:2px}
+
+/* cartas */
+.mao{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:9px}
+.ct{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:10px;min-width:0;
+  display:flex;flex-direction:column;gap:5px;cursor:pointer;position:relative;text-align:left;font-size:13px}
+.ct:hover:not(.no){border-color:var(--cyan)}
+.ct.no{opacity:.4;cursor:not-allowed}
+.ct.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
+.ct.estatica{cursor:default}
+.ct .tp{font-family:var(--disp);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.ct.PROGRAMA .tp{color:var(--verde)}.ct.CONDUTA .tp{color:var(--cyan)}.ct.CONTEXTO .tp{color:var(--roxo)}
+.ct .nm{font-family:var(--disp);font-size:16px;font-weight:600;line-height:1.1}
+.ct .tx{font-size:12px;color:var(--dim);line-height:1.38}
+.ct .cst{position:absolute;top:8px;right:9px;font-family:var(--num);font-size:13px;font-weight:700;color:var(--cyan);
+  background:rgba(10,16,24,.82);border-radius:3px;padding:0 4px}
+.ct .cg{font-family:var(--num);font-size:11px;color:var(--ambar)}
+.ct .cop{position:absolute;top:8px;left:9px;font-family:var(--num);font-size:10px;color:var(--faint);
+  background:rgba(10,16,24,.82);border-radius:3px;padding:0 4px}
+
+/* mercado */
+.mkt{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:9px}
+.mkt .ct.levada{opacity:.3;cursor:not-allowed;filter:grayscale(1)}
+.mkt .ct .quem{position:absolute;inset:auto 0 0 0;font-family:var(--disp);font-size:11px;letter-spacing:.08em;
+  text-align:center;padding:3px;border-radius:0 0 4px 4px}
+.vez{border:1px solid var(--cyan);background:#10242C;border-radius:5px;padding:10px 13px;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.vez .q{font-family:var(--disp);font-size:19px;font-weight:700;color:var(--cyan)}
+.cnt{display:flex;gap:4px}
+.cnt b{display:block;width:9px;height:9px;border-radius:50%;background:var(--line)}
+.cnt b.on{background:var(--cyan)}
+
+/* duelo */
+.duelo{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
+.duelo .lado{text-align:center}
+.duelo .vs{font-family:var(--disp);font-size:13px;color:var(--faint)}
+.duelo .n{font-family:var(--num);font-size:40px;font-weight:700;line-height:1}
+.prob{display:flex;flex-direction:column;gap:5px}
+.bar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%}
+.slot{border:1px dashed var(--line);border-radius:5px;padding:9px;background:var(--panel);min-height:58px;cursor:pointer}
+.slot.cheio{border-style:solid}
+.slot.sel{border-color:var(--cyan)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
+.logbox{max-height:230px;overflow-y:auto;font-size:13px;display:flex;flex-direction:column;gap:5px}
+.logbox div{padding-bottom:5px;border-bottom:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:5px 7px;border-bottom:1px solid var(--line)}
+th{font-family:var(--disp);font-size:11px;letter-spacing:.09em;color:var(--faint);text-transform:uppercase}
+.tw{overflow-x:auto}
+.sep{height:1px;background:var(--line);margin:4px 0}
+input[type=text]{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:4px;
+  padding:9px 11px;font-family:var(--corpo);font-size:14px;width:100%;max-width:280px}
+.aviso{border-left:3px solid var(--ambar);background:#2A2114;padding:10px 13px;border-radius:0 5px 5px 0;font-size:13px}
+.ok{border-left:3px solid var(--verde);background:#14281F;padding:10px 13px;border-radius:0 5px 5px 0;font-size:13px}
+.curva{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:11px}
+/* mapa de quadra */
+.qd{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:11px}
+.qd .linha{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.qd .net{height:4px;background:linear-gradient(90deg,var(--line),var(--cyan),var(--line));
+  border-radius:2px;margin:9px 0 11px;position:relative}
+.qd .net::after{content:"REDE";position:absolute;left:50%;top:-7px;transform:translateX(-50%);
+  background:var(--panel2);padding:0 7px;font-family:var(--disp);font-size:10px;letter-spacing:.14em;color:var(--cyan)}
+.sl{border:1px dashed var(--line);border-radius:5px;padding:7px;min-height:84px;background:var(--panel);
+  cursor:pointer;display:flex;flex-direction:column;gap:3px;text-align:left;min-width:0;position:relative}
+.sl:hover{border-color:var(--cyan)}
+.sl.cheio{border-style:solid}
+.sl.alvo{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
+.sl .pede{font-family:var(--disp);font-size:9.5px;letter-spacing:.07em;color:var(--faint);text-transform:uppercase}
+.sl .quem{font-family:var(--disp);font-size:14px;font-weight:600;line-height:1.05}
+.sl .vaz{color:var(--faint);font-size:11px;font-style:italic}
+.sl .n{font-family:var(--num);font-size:19px;font-weight:700;line-height:1}
+.sl .imp{font-size:9.5px;color:var(--ambar);line-height:1.2}
+.sl .imp.grave{color:var(--vermelho)}
+.sl .zq{font-family:var(--num);font-size:9.5px;padding:1px 4px;border-radius:2px;align-self:flex-start}
+
+/* guia: o que fazer agora */
+#guia{position:sticky;top:calc(env(safe-area-inset-top,0px) + 44px);z-index:9;margin-bottom:14px}
+#guia.aberto{position:static}
+.gbar{display:flex;gap:10px;align-items:center;background:#10242C;border:1px solid var(--cyan);
+  border-radius:5px;padding:10px 12px;cursor:pointer}
+.gbar .ico{font-family:var(--disp);font-size:13px;font-weight:700;color:#071016;background:var(--cyan);
+  border-radius:50%;width:21px;height:21px;display:flex;align-items:center;justify-content:center;flex:0 0 21px}
+.gbar .tx{font-size:13.5px;line-height:1.35}
+.gbar .ab{margin-left:auto;font-family:var(--disp);font-size:11px;letter-spacing:.08em;color:var(--cyan);white-space:nowrap}
+.gpan{background:var(--panel);border:1px solid var(--cyan);border-top:none;border-radius:0 0 5px 5px;padding:13px}
+.gpan ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.gpan li::marker{color:var(--cyan);font-weight:700}
+.gpan .dec{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:13.5px}
+.gpan .dec b{color:var(--cyan);font-family:var(--disp);letter-spacing:.06em;display:block;font-size:11px;margin-bottom:3px}
+
+/* ficha de detalhe (toque, pensada para celular) */
+#ficha{position:fixed;inset:0;z-index:50;background:rgba(6,10,15,.82);display:flex;
+  align-items:flex-end;justify-content:center;padding:0}
+#ficha .sheet{background:var(--panel);border:1px solid var(--line);border-radius:10px 10px 0 0;
+  width:100%;max-width:560px;max-height:88vh;overflow-y:auto;padding:16px;
+  padding-bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:11px}
+#ficha .alca{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 4px}
+@media(min-width:620px){#ficha{align-items:center}#ficha .sheet{border-radius:10px;max-height:84vh}}
+.fseg{border-left:2px solid var(--line);padding:2px 0 2px 11px}
+.fseg .lbl{display:block;margin-bottom:3px}
+.conselho{border-left:3px solid var(--cyan);background:#10242C;padding:11px 13px;border-radius:0 5px 5px 0;font-size:13.5px}
+.info{position:absolute;top:7px;right:7px;width:22px;height:22px;border-radius:50%;
+  border:1px solid var(--line);background:rgba(10,16,24,.86);color:var(--dim);
+  font-family:var(--disp);font-size:12px;font-weight:700;line-height:1;padding:0;
+  display:flex;align-items:center;justify-content:center;z-index:2}
+.info:hover{border-color:var(--cyan);color:var(--cyan)}
+.atl{position:relative}
+.ct .cst{right:34px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="hud" hidden><div class="row">
+  <div class="row" style="gap:10px">
+    <span class="disp" style="font-size:19px;font-weight:700">DOSE</span>
+    <div class="tl" id="tl"></div>
+  </div>
+  <div class="row" id="huddir" style="gap:7px"></div>
+</div></div>
+<div id="guia"></div>
+<div id="app"></div>
+<div id="ficha" hidden></div>
+
+<script>
+"use strict";
+const $ = (s)=>document.querySelector(s);
+const el = (t,c,x)=>{const n=document.createElement(t); if(c)n.className=c; if(x!=null)n.textContent=x; return n;};
+const cl = (v,a,b)=>Math.max(a,Math.min(b,v));
+const pct = (v)=>Math.round(v*100)+"%";
+
+/* ══════════════════════ CATÁLOGO · jogadoras, IDÊNTICAS PARA OS DOIS LADOS ══════════════════════
+   Revisão 2: não há mais draft de elenco. Os dois grupos recebem estas doze, com os
+   mesmos nomes e os mesmos atributos. A partida é um espelho — toda diferença de
+   resultado é atribuível à decisão, e é só por isso que o debrief funciona.
+   `cro` é a carga a que ela já está adaptada: define a margem que ela tem para treinar. */
+const ATLETAS = [
+ {id:"marina",  nm:"Marina",   fn:"Oposta",             pos:"ATQ", base:9, cro:5, n:10, pose:"ataque",
+  hab:"Potência: +1 na demanda que impõe.", pas:"Crônica alta: destreina se não receber bastante carga.", mods:{demanda:1}},
+ {id:"bianca",  nm:"Bianca",   fn:"Oposta veterana",    pos:"ATQ", base:8, cro:5, n:7,  pose:"ataque",
+  hab:"Leitura de jogo: +1 ponto quando vence o duelo.", pas:"Recuperação lenta: cura 1 menos.", mods:{bonusPonto:1, curaMenos:1}},
+ {id:"juliana", nm:"Juliana",  fn:"Ponteira",           pos:"ATQ", base:7, cro:4, n:4,  pose:"ataque",
+  hab:"Constância: absorve o primeiro ponto de lesão.", pas:"—", mods:{absorve:1}},
+ {id:"leticia", nm:"Letícia",  fn:"Ponteira",           pos:"ATQ", base:6, cro:4, n:12, pose:"ataque",
+  hab:"—", pas:"—", mods:{}},
+ {id:"rafaela", nm:"Rafaela",  fn:"Central",            pos:"ATQ", base:6, cro:3, n:15, pose:"bloqueio",
+  hab:"Resiliente: −8 p.p. de risco por carga.", pas:"—", mods:{protecao:.08}},
+ {id:"camila",  nm:"Camila",   fn:"Ponteira de base",   pos:"ATQ", base:5, cro:2, n:18, pose:"ataque",
+  hab:"—", pas:"Destreinada: crônica inicial baixa.", mods:{}},
+
+ {id:"paula",   nm:"Paula",    fn:"Líbero",             pos:"DEF", base:8, cro:4, n:3,  pose:"defesa",
+  hab:"Leitura de jogo: −10 p.p. de risco de lesão.", pas:"—", mods:{protecao:.10}},
+ {id:"fernanda",nm:"Fernanda", fn:"Central bloqueadora",pos:"DEF", base:7, cro:5, n:5,  pose:"bloqueio",
+  hab:"—", pas:"—", mods:{}},
+ {id:"helena",  nm:"Helena",   fn:"Líbero veterana",    pos:"DEF", base:7, cro:3, n:1,  pose:"defesa",
+  hab:"—", pas:"Ombro sensível: +10 p.p. de risco sem programa de ombro.", mods:{ombro:true}},
+ {id:"isadora",   nm:"Isadora",    fn:"Central",            pos:"DEF", base:6, cro:3, n:9,  pose:"bloqueio",
+  hab:"—", pas:"—", mods:{}},
+ {id:"eliza",   nm:"Eliza",    fn:"Líbero de base",     pos:"DEF", base:5, cro:2, n:16, pose:"defesa",
+  hab:"—", pas:"Destreinada: crônica inicial baixa.", mods:{}},
+ {id:"mariana", nm:"Mariana",  fn:"Central revelação",  pos:"DEF", base:6, cro:2, n:11, pose:"bloqueio",
+  hab:"Precisão: +3 de defesa enquanto estiver na DOSE CERTA.",
+  pas:"Jovem: crônica inicial baixa. A margem dela é estreita e sai da faixa fácil.",
+  mods:{protecao:.06, doseCerta:3}},
+];
+const ATL = Object.fromEntries(ATLETAS.map(a=>[a.id,a]));
+
+/* ══════════════════════ PSE · CARGA INTERNA × EXTERNA ══════════════════════
+   Aula 04. "Externa é o que se pede, interna é o que custa."
+   A carga que aparece na carta é a PRESCRITA. A que entra no histórico — e portanto
+   na razão aguda:crônica — é a prescrita multiplicada pelo FATOR DE RESPOSTA daquela
+   atleta naquela rodada. Você não vê o fator: você PERGUNTA, gastando energia.
+
+   O centro de cada atleta segue de longe a crônica inicial — quem está mais adaptada
+   costuma pagar menos. Mas só de longe, e as exceções são deliberadas: a Bianca tem
+   crônica 5 e paga caro (recuperação lenta), a Rafaela tem crônica 3 e paga barato
+   (resiliente), a Helena é veterana e paga caríssimo. Se o fator fosse calculável a
+   partir da carta, medir seria perda de energia — e a aula diz o contrário. */
+const FAT = {
+  marina:1.00, bianca:1.12, juliana:1.02, leticia:1.05, rafaela:1.00, camila:1.18,
+  paula:1.00, fernanda:1.05, helena:1.15, isadora:1.08, eliza:1.16, mariana:1.10,
+};
+const PSE_CUSTO = 1;      // colher a PSE da sessão custa 1 de energia
+const PSE_RUIDO = .10;    // amplitude do sorteio em torno do centro
+
+/* ══════════════════════ CATÁLOGO · cartas de ação ══════════════════════
+   alvo: "atleta" | "atletaAdv" | "nenhum" | "duelo" | "dueloAdv"
+   quando: "treino" | "jogo" | "sempre"
+   cop: cópias no monte de 48 — cópias pesadas, não uniformes. */
+const ACOES = [
+ /* ── 8 PROGRAMAS (encantamento: age toda rodada, cobra manutenção e carga) */
+ {id:"forca", t:"PROGRAMA", nm:"Programa de força", custo:3, cg:3, cop:2, alvo:"atleta", quando:"treino",
+  tx:"+2 no atributo principal da atleta enquanto ativo.", ef:{attr:2}},
+ {id:"plio", t:"PROGRAMA", nm:"Pliometria", custo:3, cg:4, cop:2, alvo:"atleta", quando:"treino", soPos:"ATQ",
+  tx:"+3 de ataque. Só em atacante. Carga alta.", ef:{attr:3}},
+ {id:"propri", t:"PROGRAMA", nm:"Propriocepção", custoBase:1, cg:2, cop:2, alvo:"x", quando:"treino", soPos:"DEF",
+  tx:"Escolha X defensoras. +2 de defesa em cada uma.", ef:{attr:2}},
+ {id:"core", t:"PROGRAMA", nm:"Core e controle de tronco", custo:2, cg:2, cop:2, alvo:"atleta", quando:"treino",
+  tx:"+1 no atributo e −6 p.p. de risco por carga.", ef:{attr:1, protecao:.06}},
+ {id:"ombro", t:"PROGRAMA", nm:"Programa de ombro", custoBase:1, cg:2, cop:2, alvo:"x", quando:"treino",
+  tx:"Escolha X atletas. +1 no atributo e −8 p.p. em cada. Resolve ombro sensível.", ef:{attr:1, protecao:.08, ombroOk:true}},
+ {id:"recup", t:"PROGRAMA", nm:"Recuperação ativa", custo:2, cg:1, cop:2, alvo:"atleta", quando:"treino",
+  tx:"−15% da carga aguda por rodada, nunca abaixo da razão 1,00. E −12 p.p. de risco.", ef:{protecao:.12, reduzRodada:.15}},
+ {id:"sono", t:"PROGRAMA", nm:"Protocolo de sono", custoBase:1, cg:0, cop:2, alvo:"x", quando:"treino",
+  tx:"Escolha X atletas. Nenhuma carga. −8 p.p. de risco e a PSE delas fica mais barata e mais previsível.", ef:{protecao:.08, sonoOk:true}},
+ {id:"nutri", t:"PROGRAMA", nm:"Disponibilidade energética", custoBase:1, cg:0, cop:2, alvo:"x", quando:"treino",
+  tx:"Escolha X atletas. Nenhuma carga. Anula 1 ponto de fadiga e barateia a PSE em cada.", ef:{antifadiga:1}},
+
+ /* ── 11 CONDUTAS (instant) */
+ {id:"tatatq", t:"PROGRAMA", nm:"Treino tático de ataque", custo:4, cg:2, cop:2, alvo:"todas", soPos:"ATQ", quando:"treino",
+  tx:"TODAS as suas atacantes. +1 de ataque em cada. Carga +2 por rodada em cada.", ef:{attr:1}},
+ {id:"tatdef", t:"PROGRAMA", nm:"Treino tático de defesa", custo:4, cg:2, cop:2, alvo:"todas", soPos:"DEF", quando:"treino",
+  tx:"TODAS as suas defensoras. +1 de defesa em cada. Carga +2 por rodada em cada.", ef:{attr:1}},
+ {id:"descarga", t:"CONDUTA", nm:"Descarga planejada", custo:3, cop:2, alvo:"atleta", quando:"treino",
+  tx:"−40% da carga aguda, nunca abaixo da razão 1,00. Custa −2 de atributo até o próximo jogo.",
+  ef:{reduzAguda:.40, attrPenal:2}},
+ {id:"crio", t:"CONDUTA", nm:"Crioterapia e analgesia", custoBase:0, cop:2, alvo:"x", quando:"sempre",
+  tx:"Escolha X atletas. Cura 1 em cada. Alivia, não reconstrói."},
+ {id:"aquecimento", t:"CONDUTA", nm:"Aquecimento específico", custoBase:0, cop:2, alvo:"x", quando:"treino",
+  tx:"Escolha X atletas. −10 p.p. de risco em cada uma até o próximo jogo.", ef:{protecaoTmp:.10}},
+ {id:"fisio", t:"CONDUTA", nm:"Fisioterapia intensiva", custo:3, cop:2, alvo:"atleta", quando:"treino",
+  tx:"Cura 2 de lesão."},
+ {id:"reab", t:"CONDUTA", nm:"Protocolo de reabilitação", custo:5, cop:1, alvo:"atleta", quando:"treino",
+  tx:"Cura 3 de lesão. Devolve a atleta descartada ao elenco."},
+ {id:"peace", t:"CONDUTA", nm:"PEACE & LOVE", custo:2, cop:2, alvo:"atleta", quando:"treino",
+  tx:"Cura 1 de lesão e −15 p.p. de risco até o próximo jogo."},
+ {id:"banda", t:"CONDUTA", nm:"Bandagem funcional", custo:2, cop:2, alvo:"duelo", quando:"jogo",
+  tx:"+2 de capacidade neste duelo. Restrição mecânica, não cura."},
+ {id:"imediato", t:"CONDUTA", nm:"Atendimento imediato", custo:2, cop:2, alvo:"duelo", quando:"jogo",
+  tx:"Evita 1 ponto de lesão neste duelo."},
+ {id:"teste", t:"CONDUTA", nm:"Teste funcional", custo:1, cop:2, alvo:"atletaAdv", quando:"sempre",
+  tx:"Revela a razão aguda:crônica exata de uma atleta adversária."},
+ {id:"tempo", t:"CONDUTA", nm:"Tempo técnico", custo:2, cop:1, alvo:"dueloAdv", quando:"jogo",
+  tx:"−2 na demanda que o ataque adversário impõe neste duelo."},
+ {id:"troca", t:"CONDUTA", nm:"Substituição", custo:3, cop:1, alvo:"nenhum", quando:"jogo",
+  tx:"Antes de um duelo, sai 1 ponto de lesão de uma atleta sua em quadra."},
+ /* Vôlei não tem entrada dura — não existe carrinho nem disputa de bola com o pé.
+    O trauma agudo clássico do vôlei é OUTRO: a atacante ou bloqueadora invade a linha
+    central e a adversária aterrissa em cima do pé dela. É o mecanismo mais comum de
+    entorse lateral de tornozelo na modalidade, e quem causa é mesmo a adversária —
+    então a interação continua existindo, agora com o gesto certo. */
+ {id:"invasao", t:"CONDUTA", nm:"Invasão na linha central", custo:3, cop:1, alvo:"atletaAdv", quando:"jogo",
+  tx:"Só contra quem está na REDE. Entorse de tornozelo: 1 de lesão sempre. +1 se ela estiver em sobrecarga; −1 se tiver propriocepção ou bandagem. É falta: o ponto do duelo vai para ela."},
+
+ /* ── 6 CONTEXTO */
+ {id:"coletivo", t:"CONTEXTO", nm:"Treino coletivo", custo:2, cop:2, alvo:"todas", quando:"treino",
+  tx:"ELENCO INTEIRO. +3 de carga em todas as SUAS atletas nesta rodada."},
+ {id:"calend", t:"CONTEXTO", nm:"Calendário congestionado", custo:3, cop:1, alvo:"nenhum", quando:"treino",
+  tx:"A adversária tem só 2 de energia na próxima rodada de treino."},
+ {id:"viagem", t:"CONTEXTO", nm:"Viagem longa", custo:2, cop:1, alvo:"nenhum", quando:"treino",
+  tx:"+2 de carga em todas as atletas adversárias nesta rodada."},
+ {id:"scout", t:"CONTEXTO", nm:"Scouting", custo:2, cop:1, alvo:"nenhum", quando:"treino",
+  tx:"Revela as razões de todo o elenco adversário até o fim da partida."},
+ {id:"diretoria", t:"CONTEXTO", nm:"Pressão da diretoria", custo:0, cop:1, alvo:"nenhum", quando:"treino",
+  tx:"Ganhe 3 de energia agora. Perca 2 na próxima rodada."},
+ {id:"acelerado", t:"CONTEXTO", nm:"Jogo acelerado", custo:2, cop:1, alvo:"duelo", quando:"jogo",
+  tx:"+3 na demanda que seu ataque impõe neste duelo."},
+ {id:"saque", t:"CONTEXTO", nm:"Saque potente", custo:2, cop:1, alvo:"duelo", quando:"jogo",
+  tx:"+2 na demanda e, se vencer o duelo, +1 ponto."},
+];
+const ACAO = Object.fromEntries(ACOES.map(c=>[c.id,c]));
+/* Custo X, como no Magic: você decide o alcance e paga por cabeça.
+   É a decisão de triagem de uma comissão técnica — cobrir meia equipe raso ou
+   duas atletas fundo — e vira um botão em vez de uma categoria que eu escolhi. */
+const ehX = (c)=>c.alvo==="x";
+const custoDe = (c, n)=>ehX(c) ? (c.custoBase + (n||0)) : c.custo;
+const rotuloCusto = (c)=>ehX(c) ? (c.custoBase ? "X+"+c.custoBase : "X") : String(c.custo);
+const custoMinimo = (c)=>ehX(c) ? c.custoBase + 1 : c.custo;
+/* Carta de elenco inteiro não deixa escolher: ou pega todas as atacantes, ou todas as
+   defensoras, ou todas. Isso é o ponto delas — e é por isso que abrem o painel mesmo
+   assim, para você VER quem vai estourar antes de confirmar. */
+function alvosAuto(j, c){
+  if(c.alvo !== "todas") return [];
+  return j.elenco.filter(a=>!c.soPos || c.soPos===a.pos)
+                 .filter(a=>c.t!=="PROGRAMA" || !a.progs.includes(c.id));
+}
+const PROGRAMAS = ACOES.filter(c=>c.t==="PROGRAMA");
+const TOTAL_CARTAS = ATLETAS.length + ACOES.length;
+
+/* monte de 48: 6 cartas com 3 cópias, 11 com 2, 8 com 1 */
+function montarDeck(){
+  const d=[];
+  for(const c of ACOES) for(let i=0;i<c.cop;i++) d.push(c.id);
+  return d;
+}
+const TOTAL_DECK = ACOES.reduce((s,c)=>s+c.cop,0);
+
+/* ══════════════════════ SEQUÊNCIA E ECONOMIA ══════════════════════ */
+const SEQ = [
+ {k:"T",r:"T1"},{k:"T",r:"T2"},{k:"T",r:"T3"},{k:"J",r:"J1"},
+ {k:"T",r:"T4"},{k:"T",r:"T5"},{k:"T",r:"T6"},{k:"J",r:"J2"},
+];
+const CARGA_JOGO = 6;          // a partida é a maior carga da semana
+/* O time TREINA JUNTO. Toda atleta recebe esta carga por rodada, de graça e sem carta:
+   é o treino coletivo, que na vida real é a maior parte do volume de todo mundo.
+   O trabalho individual vem POR CIMA disso — e é aí que mora o perigo, porque quem já
+   está no limite com o coletivo estoura com qualquer programa a mais. */
+const CARGA_COLETIVA = 3;
+const VERBA_PRE = 12;          // pré-temporada: compra ESTRUTURA, não jogadoras
+const ENERGIA_BASE = 6;
+const ENERGIA_PERDEDOR = 7;    // freio de volume, reduzido de 8 — o resto virou acesso
+const MERCADO_VIRADAS = 6;     // cartas para cima por rodada de treino
+const ESCOLHAS = 3;            // cada grupo leva 3, alternando
+const LIMITE_MAO = 8;
+
+/* ══════════════════════ MOTOR DE CARGA ══════════════════════
+   aguda   = soma das 2 últimas rodadas
+   crônica = soma das 6 últimas ÷ 3   (mesma unidade da aguda)
+   histórico nasce com 6 rodadas no valor da crônica inicial, então toda atleta
+   começa em razão 1,00 — e a margem de cada uma é diferente. */
+const aguda = (a)=>a.hist.slice(-2).reduce((s,v)=>s+v,0);
+const soma6 = (a)=>a.hist.slice(-6).reduce((s,v)=>s+v,0);
+const cronica = (a)=>Math.max(.5, soma6(a)/3);
+const razao = (a)=>aguda(a)/cronica(a);
+
+function zona(r){ return r<.8 ? "vermelho" : r<=1.25 ? "verde" : r<=1.45 ? "ambar" : "vermelho"; }
+function rotuloZona(r){
+  if(r<.8) return "destreinada";
+  if(r<=1.25) return "dose certa";
+  if(r<=1.45) return "atenção";
+  return "sobrecarga";
+}
+
+/* ── RECUPERAÇÃO REDUZ CARGA AGUDA, COM PISO EM RAZÃO 1,00 ────────────────────────
+   Carga aplicada não se desfaz; o que a recuperação faz, lida pelo modelo
+   fitness-fadiga, é acelerar o decaimento do componente de fadiga.
+
+   Cuidado que a versão ingênua erra: tirar carga das duas últimas rodadas reduz
+   TAMBÉM o denominador, porque a crônica é a soma das seis. Então não basta cortar
+   uma fração da aguda e conferir depois. Resolvendo exato, com corte c:
+       razão_nova = 3(aguda − c) / (soma6 − c) ≥ 1   ⟺   c ≤ (3·aguda − soma6)/2
+   Esse é o corte máximo que não atravessa a dose certa. O piso é estrutural, não
+   uma checagem: a recuperação nunca destreina ninguém, e nunca salva quem treinou
+   de menos — se a atleta já está em 1,00 ou abaixo, cMax ≤ 0 e a carta não faz nada. */
+function reduzAguda(a, frac){
+  const ag = aguda(a), s6 = soma6(a);
+  const cMax = (3*ag - s6) / 2;
+  if(cMax <= 0) return 0;                       // já bem dosada ou destreinada: inútil
+  const corte = Math.min(ag * frac, cMax);
+  let resto = corte;
+  for(let i = a.hist.length - 1; i >= Math.max(0, a.hist.length - 2) && resto > 1e-9; i--){
+    const tira = Math.min(a.hist[i], resto);
+    a.hist[i] -= tira; resto -= tira;
+  }
+  return corte - resto;
+}
+
+/* curva em U: destreinada e sobrecarregada perdem; no meio, risco baixo.
+   A inclinação dos dois braços é parecida de propósito — nenhum dos dois erros
+   é mais barato que o outro. */
+function riscoCarga(a){
+  const r = razao(a);
+  let p;
+  if(r < .8)       p = .10 + (.8 - r) * .60;
+  else if(r<=1.25) p = .05;
+  else             p = .05 + (r - 1.25) * .60;
+  p -= protecao(a);
+  p += (a.mods.riscoExtra || 0);
+  if(a.mods.ombro && !temEf(a,"ombroOk")) p += .10;
+  return cl(p, .02, .80);
+}
+const temEf = (a,k)=>a.progs.some(p=>ACAO[p].ef && ACAO[p].ef[k]);
+function protecao(a){
+  let s = a.mods.protecao || 0;
+  for(const p of a.progs) s += (ACAO[p].ef.protecao || 0);
+  s += a.tmp.protecao || 0;
+  return s;
+}
+function fadiga(a){
+  const r = razao(a);
+  let f = Math.max(0, Math.round((r - 1.2) * 2.5));
+  let anti = 0; for(const p of a.progs) anti += (ACAO[p].ef.antifadiga || 0);
+  return Math.max(0, f - anti);
+}
+function atributo(a){
+  let v = a.base;
+  for(const p of a.progs){ const ef = ACAO[p].ef; if(ef.attr) v += ef.attr; }
+  /* Bônus de dose certa: rende mais enquanto está na faixa e perde o bônus ao sair
+     dela — para cima OU para baixo. É a curva dose-resposta dentro do próprio número
+     da carta: treinar demais não fica só mais arriscado, fica pior. */
+  if(a.mods.doseCerta && zona(razao(a))==="verde") v += a.mods.doseCerta;
+  return Math.max(0, v - fadiga(a) - a.lesao - (a.tmp.attrPenal || 0));
+}
+const disponivel = (a)=>a.lesao < 3;
+
+/* ── PROJEÇÃO ───────────────────────────────────────────────────────────────
+   O problema que isto resolve: na pré-temporada TODA atleta está em "dose certa",
+   porque o histórico nasce no valor da crônica dela e ninguém treinou ainda. A carta
+   dizia "está tudo bem" exatamente no momento em que é preciso agir — e quem não
+   recebe carga nenhuma chega ao jogo em razão 0,00.
+   A projeção roda a carga atual até o próximo dia de jogo e mostra onde ela VAI parar.
+   É o número que importa para decidir, e não o de agora. */
+function rodadasAteJogo(){
+  if(!S) return 0;
+  let n = 0;
+  for(let i = S.rodada; i < SEQ.length; i++){
+    if(SEQ[i].k === "J") return n;
+    n++;
+  }
+  return n;
+}
+function proxJogo(){
+  for(let i = S.rodada; i < SEQ.length; i++) if(SEQ[i].k === "J") return SEQ[i].r;
+  return null;
+}
+function projetar(a){
+  const n = rodadasAteJogo();
+  if(n <= 0) return null;
+  const c = {mods:a.mods, progs:a.progs, tmp:a.tmp, lesao:a.lesao, base:a.base,
+             hist:a.hist.slice()};
+  const cg = cargaRodada(a) * fatorCrido(a);
+  let fr = 0; for(const p of a.progs) fr = Math.max(fr, ACAO[p].ef.reduzRodada || 0);
+  for(let k=0;k<n;k++){ c.hist.push(cg); if(fr>0) reduzAguda(c, fr); }
+  return razao(c);
+}
+
+/* manutenção: 1 de energia a cada 2 programas ativos no elenco inteiro.
+   Com 12 atletas em vez de 6, manutenção de 1 por programa consumiria a rodada
+   toda e o mercado não teria para onde ir. */
+function totalProgs(j){ let s=0; for(const a of j.elenco) s += a.progs.length; return s; }
+/* 1 de energia a cada 3 programas instalados. Com custo X, cobrir meio elenco gera
+   muita instalação — e a manutenção é justamente o que cobra o alcance semana após
+   semana, que é como funciona de verdade: programa amplo consome hora de equipe. */
+function manutencao(j){ return Math.ceil(totalProgs(j) / 3); }
+function cargaIndividual(a){ let c=0; for(const p of a.progs) c += ACAO[p].cg; return c; }
+function cargaRodada(a){ return CARGA_COLETIVA + cargaIndividual(a); }
+
+/* ── o fator de resposta ─────────────────────────────────────────────────────
+   Não é ruído puro: tem causas, e as causas são as da ementa. Quem entendeu a aula
+   consegue prever a DIREÇÃO sem pagar — o que não consegue é prever o valor. */
+function centroPSE(a, j){
+  let c = a.fat != null ? a.fat : 1;
+  if(a.lesao > 0)           c += .10;   // voltando de lesão, o mesmo treino custa mais
+  if(j && j.estressePSE)    c += j.estressePSE;   // viagem longa na rodada anterior
+  if(temEf(a,"sonoOk"))     c -= .07;   // dormir bem barateia o mesmo treino
+  if(temEf(a,"antifadiga")) c -= .05;   // disponibilidade energética idem
+  return cl(c, .80, 1.45);
+}
+function amplitudePSE(a){
+  let amp = PSE_RUIDO;
+  if(temEf(a,"sonoOk"))     amp -= .04;   // sono e nutrição ESTREITAM a faixa:
+  if(temEf(a,"antifadiga")) amp -= .03;   // a atleta fica previsível, que é o ganho real
+  return Math.max(.02, amp);
+}
+function sortearPSE(a, j, rnd){
+  const u = (rnd || Math.random)();
+  return cl(centroPSE(a,j) + (u*2-1)*amplitudePSE(a), .75, 1.50);
+}
+const fatorHoje = (a)=> a.fatHoje != null ? a.fatHoje : 1;
+/* O que o grupo ACREDITA que vai acontecer: 1,00 enquanto nunca mediu. É de propósito —
+   quem não mede projeta errado, e erra sempre para o mesmo lado. */
+const fatorCrido = (a)=> a.pseVisto != null ? a.pseVisto : 1;
+function cargaPrescrita(a, j){ return cargaRodada(a) + ((j && j.cargaExtra) || 0); }
+function cargaReal(a, j){ return cargaPrescrita(a,j) * fatorHoje(a); }
+function sortearFatores(rnd){
+  for(const j of S.j){
+    for(const a of j.elenco) a.fatHoje = sortearPSE(a, j, rnd);
+    j.estressePSE = 0;
+    j.pseAberta = false;
+  }
+}
+
+/* dono do objeto-atleta: a grade precisa saber de quem é para ler a PSE do grupo */
+function donoDe(a){
+  if(!S || !S.j) return null;
+  for(const j of S.j) if(j.elenco.indexOf(a) >= 0) return j;
+  return null;
+}
+const nf = (v)=> Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".",",");
+
+/* ══════════════════════ DUELO ══════════════════════ */
+/* LESÃO NO TREINO. Na vida real a maior parte das lesões por sobrecarga acontece
+   treinando, não jogando — é esse o motivo de monitorar carga. O risco por rodada é
+   uma fração do risco de jogo: o gesto de treino é menos extremo que o de competição,
+   mas a exposição é muito maior, porque são seis rodadas de treino para dois jogos. */
+const FATOR_TREINO = .35;
+function riscoTreino(a){ return riscoCarga(a) * FATOR_TREINO; }
+
+function pPonto(dem, cap){ return cl(.50 + (dem - cap) * .06, .08, .92); }
+function pLesaoDef(def, dem, cap, imp){ return cl(riscoCarga(def) + Math.max(0, dem - cap) * .07 + (imp||0), .02, .85); }
+function pLesaoAtq(atq, imp){ return cl(riscoCarga(atq) + (imp||0), .02, .85); }
+
+/* ══════════════════════ ARTE · ilustrações vetoriais ══════════════════════
+   Vetor e não arte pintada: o jogo é projetado e lido de longe, e a dez metros o que
+   lê é silhueta, contraste e número. Tudo inline, nada carrega da rede.
+   Canvas 100×60, solo em y=52, traço 2.6 arredondado. */
+const NS = "http://www.w3.org/2000/svg";
+const FIG = "#AFC2D2", SOLO = "#2A3845";
+function svgArte(inner, rot){
+  const s = document.createElementNS(NS,"svg");
+  s.setAttribute("viewBox","0 0 100 60");
+  s.setAttribute("class","arte");
+  s.setAttribute("role","img");
+  s.setAttribute("aria-label", rot || "");
+  s.innerHTML = '<g fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">'
+              + '<line x1="4" y1="52" x2="96" y2="52" stroke="'+SOLO+'"/>' + inner + '</g>';
+  return s;
+}
+/* ── três poses de quadra, uma por função ── */
+function poseAtleta(pose, ac, numero){
+  const n = '<text x="92" y="18" fill="'+ac+'" font-family="JetBrains Mono, monospace" font-size="15"'
+          + ' font-weight="700" text-anchor="end" stroke="none">'+numero+'</text>';
+  if(pose==="ataque") return n
+    + '<circle cx="44" cy="16" r="5" stroke="'+FIG+'"/>'
+    + '<path d="M44 21 L46 34" stroke="'+FIG+'"/>'
+    + '<path d="M46 24 L59 12" stroke="'+ac+'"/>'
+    + '<path d="M44 25 L33 32" stroke="'+FIG+'"/>'
+    + '<path d="M46 34 L39 45 M46 34 L53 44" stroke="'+FIG+'"/>'
+    + '<circle cx="70" cy="9" r="6" stroke="'+ac+'"/>';
+  if(pose==="bloqueio") return n
+    + '<path d="M6 21 H78 M6 28 H78" stroke="'+SOLO+'"/>'
+    + '<path d="M18 21 V28 M30 21 V28 M42 21 V28 M54 21 V28 M66 21 V28" stroke="'+SOLO+'"/>'
+    + '<circle cx="50" cy="35" r="5" stroke="'+FIG+'"/>'
+    + '<path d="M47 39 L42 13 M53 39 L58 13" stroke="'+ac+'"/>'
+    + '<path d="M50 40 L50 47 M50 47 L44 52 M50 47 L56 52" stroke="'+FIG+'"/>';
+  return n   /* defesa */
+    + '<circle cx="40" cy="29" r="5" stroke="'+FIG+'"/>'
+    + '<path d="M42 34 L56 42" stroke="'+FIG+'"/>'
+    + '<path d="M40 34 L26 39" stroke="'+ac+'"/>'
+    + '<path d="M56 42 L64 51 M56 42 L51 52" stroke="'+FIG+'"/>'
+    + '<circle cx="17" cy="33" r="6" stroke="'+ac+'"/>';
+}
+const COR_T = {PROGRAMA:"#2FB380", CONDUTA:"#3BC9DB", CONTEXTO:"#9B7BD4"};
+
+/* ── 25 cenas, uma por carta de ação ── */
+const ARTE = {
+ forca:(c)=>'<path d="M18 30 H82" stroke="'+FIG+'"/>'
+   +'<rect x="14" y="20" width="7" height="20" rx="2" stroke="'+c+'"/><rect x="79" y="20" width="7" height="20" rx="2" stroke="'+c+'"/>'
+   +'<rect x="25" y="24" width="5" height="12" rx="1.5" stroke="'+c+'"/><rect x="70" y="24" width="5" height="12" rx="1.5" stroke="'+c+'"/>'
+   +'<path d="M40 44 H60" stroke="'+SOLO+'"/>',
+ plio:(c)=>'<rect x="12" y="34" width="30" height="18" rx="2" stroke="'+SOLO+'"/>'
+   +'<path d="M56 50 L56 22" stroke="'+c+'"/><path d="M48 30 L56 20 L64 30" stroke="'+c+'"/>'
+   +'<circle cx="78" cy="16" r="5" stroke="'+FIG+'"/><path d="M78 21 L78 34 M78 25 L70 30 M78 25 L86 30 M78 34 L73 46 M78 34 L83 46" stroke="'+FIG+'"/>',
+ propri:(c)=>'<path d="M26 44 Q50 54 74 44" stroke="'+c+'"/>'
+   +'<circle cx="50" cy="14" r="5" stroke="'+FIG+'"/><path d="M50 19 L50 36 M50 36 L50 45" stroke="'+FIG+'"/>'
+   +'<path d="M50 24 L36 20 M50 24 L64 20" stroke="'+FIG+'"/><path d="M50 32 L62 40" stroke="'+FIG+'"/>'
+   +'<path d="M20 40 Q22 34 26 32 M80 40 Q78 34 74 32" stroke="'+c+'" stroke-width="1.8"/>',
+ core:(c)=>'<path d="M20 44 L74 32" stroke="'+c+'"/><circle cx="80" cy="30" r="5" stroke="'+FIG+'"/>'
+   +'<path d="M70 34 L68 48 M22 44 L20 50" stroke="'+FIG+'"/><path d="M40 40 L38 50" stroke="'+FIG+'"/>'
+   +'<path d="M30 20 H64" stroke="'+SOLO+'" stroke-width="1.8" stroke-dasharray="4 4"/>',
+ ombro:(c)=>'<circle cx="38" cy="26" r="10" stroke="'+c+'"/><circle cx="38" cy="26" r="3" stroke="'+FIG+'"/>'
+   +'<path d="M46 31 L68 40 L74 30" stroke="'+FIG+'"/>'
+   +'<path d="M38 8 A18 18 0 0 1 56 26" stroke="'+c+'" stroke-width="1.8"/><path d="M52 21 L56 26 L51 30" stroke="'+c+'" stroke-width="1.8"/>',
+ recup:(c)=>'<path d="M6 42 Q20 36 34 42 T62 42 T90 42" stroke="'+c+'"/>'
+   +'<circle cx="52" cy="16" r="5" stroke="'+FIG+'"/><path d="M52 21 L50 32 M50 32 L44 46 M50 32 L58 44 M52 24 L42 28 M52 24 L62 28" stroke="'+FIG+'"/>',
+ sono:(c)=>'<path d="M44 10 A17 17 0 1 0 44 44 A21 21 0 1 1 44 10 Z" stroke="'+c+'"/>'
+   +'<text x="68" y="22" fill="'+FIG+'" font-family="Barlow Condensed, sans-serif" font-size="15" stroke="none">Z</text>'
+   +'<text x="78" y="33" fill="'+FIG+'" font-family="Barlow Condensed, sans-serif" font-size="11" stroke="none">z</text>'
+   +'<text x="85" y="42" fill="'+SOLO+'" font-family="Barlow Condensed, sans-serif" font-size="9" stroke="none">z</text>',
+ nutri:(c)=>'<circle cx="42" cy="28" r="17" stroke="'+FIG+'"/><circle cx="42" cy="28" r="9" stroke="'+SOLO+'" stroke-width="1.8"/>'
+   +'<path d="M72 14 L66 30 H76 L70 46" stroke="'+c+'"/>'
+   +'<path d="M16 16 V32 M12 16 V24 M20 16 V24" stroke="'+SOLO+'" stroke-width="1.8"/>',
+ descarga:(c)=>'<path d="M10 16 H28 V26 H46 V36 H64 V44 H86" stroke="'+c+'"/>'
+   +'<path d="M78 34 L86 44 L94 34" stroke="'+c+'" stroke-width="1.8"/>'
+   +'<path d="M10 44 H64" stroke="'+SOLO+'" stroke-width="1.6" stroke-dasharray="3 4"/>',
+ tatatq:(c)=>'<path d="M8 20 H70 M8 27 H70" stroke="'+SOLO+'"/><path d="M22 20 V27 M38 20 V27 M54 20 V27" stroke="'+SOLO+'"/>'
+   +'<circle cx="24" cy="34" r="4.5" stroke="'+c+'"/><path d="M24 39 L24 48 M24 41 L17 36 M24 41 L31 36" stroke="'+c+'"/>'
+   +'<circle cx="50" cy="34" r="4.5" stroke="'+c+'"/><path d="M50 39 L50 48 M50 41 L43 36 M50 41 L57 36" stroke="'+c+'"/>'
+   +'<circle cx="76" cy="34" r="4.5" stroke="'+c+'"/><path d="M76 39 L76 48 M76 41 L69 36 M76 41 L83 36" stroke="'+c+'"/>'
+   +'<circle cx="88" cy="12" r="6" stroke="#F0803C"/>',
+ tatdef:(c)=>'<circle cx="22" cy="30" r="4.5" stroke="'+c+'"/><path d="M24 35 L34 41 M24 35 L14 39" stroke="'+c+'"/>'
+   +'<circle cx="50" cy="30" r="4.5" stroke="'+c+'"/><path d="M52 35 L62 41 M52 35 L42 39" stroke="'+c+'"/>'
+   +'<circle cx="78" cy="30" r="4.5" stroke="'+c+'"/><path d="M80 35 L90 41 M80 35 L70 39" stroke="'+c+'"/>'
+   +'<path d="M6 48 Q50 38 94 48" stroke="#4A9BE0" stroke-width="1.8"/>'
+   +'<circle cx="50" cy="11" r="6" stroke="#4A9BE0"/>',
+ aquecimento:(c)=>'<circle cx="26" cy="14" r="5" stroke="'+FIG+'"/><path d="M26 19 L24 32 M24 32 L18 46 M24 32 L31 44 M26 23 L17 28 M26 23 L34 27" stroke="'+FIG+'"/>'
+   +'<circle cx="54" cy="14" r="5" stroke="'+FIG+'"/><path d="M54 19 L52 32 M52 32 L46 46 M52 32 L59 44 M54 23 L45 28 M54 23 L62 27" stroke="'+FIG+'"/>'
+   +'<circle cx="82" cy="14" r="5" stroke="'+FIG+'"/><path d="M82 19 L80 32 M80 32 L74 46 M80 32 L87 44 M82 23 L73 28 M82 23 L90 27" stroke="'+FIG+'"/>'
+   +'<path d="M10 50 Q50 40 94 50" stroke="'+c+'" stroke-width="1.8"/>',
+ coletivo:(c)=>'<path d="M8 20 H92 M8 28 H92" stroke="'+SOLO+'"/><path d="M22 20 V28 M40 20 V28 M58 20 V28 M76 20 V28" stroke="'+SOLO+'"/>'
+   +'<circle cx="22" cy="38" r="4" stroke="'+FIG+'"/><path d="M22 42 L22 50" stroke="'+FIG+'"/>'
+   +'<circle cx="40" cy="38" r="4" stroke="'+FIG+'"/><path d="M40 42 L40 50" stroke="'+FIG+'"/>'
+   +'<circle cx="58" cy="38" r="4" stroke="'+c+'"/><path d="M58 42 L58 50" stroke="'+c+'"/>'
+   +'<circle cx="76" cy="38" r="4" stroke="'+FIG+'"/><path d="M76 42 L76 50" stroke="'+FIG+'"/>'
+   +'<path d="M50 6 L50 14 M44 10 L50 4 L56 10" stroke="'+c+'" stroke-width="1.8"/>',
+ crio:(c)=>'<path d="M50 10 V46 M34 19 L66 37 M66 19 L34 37" stroke="'+c+'"/>'
+   +'<path d="M44 16 L50 10 L56 16 M44 40 L50 46 L56 40" stroke="'+c+'" stroke-width="1.8"/>'
+   +'<path d="M16 28 H28 M72 28 H84" stroke="'+SOLO+'" stroke-width="1.8"/>',
+ fisio:(c)=>'<rect x="18" y="24" width="64" height="12" rx="6" stroke="'+FIG+'"/>'
+   +'<path d="M34 20 Q38 10 44 16 Q50 8 54 18" stroke="'+c+'"/>'
+   +'<path d="M50 42 Q54 52 60 46 Q66 54 70 44" stroke="'+c+'"/>',
+ reab:(c)=>'<rect x="12" y="40" width="12" height="12" stroke="'+SOLO+'"/><rect x="28" y="32" width="12" height="20" stroke="'+SOLO+'"/>'
+   +'<rect x="44" y="24" width="12" height="28" stroke="'+c+'"/><rect x="60" y="14" width="12" height="38" stroke="'+c+'"/>'
+   +'<path d="M78 22 L84 30 L94 12" stroke="'+c+'"/>',
+ peace:(c)=>'<path d="M50 8 L74 16 V32 Q74 44 50 50 Q26 44 26 32 V16 Z" stroke="'+c+'"/>'
+   +'<path d="M50 40 Q38 32 38 26 A6 6 0 0 1 50 24 A6 6 0 0 1 62 26 Q62 32 50 40 Z" stroke="'+FIG+'"/>',
+ banda:(c)=>'<circle cx="50" cy="30" r="14" stroke="'+FIG+'"/>'
+   +'<path d="M24 16 L76 40" stroke="'+c+'" stroke-width="5"/>'
+   +'<path d="M24 44 L76 20" stroke="'+c+'" stroke-width="5" opacity=".6"/>'
+   +'<path d="M50 9 V51" stroke="'+SOLO+'" stroke-width="1.4" stroke-dasharray="3 3"/>',
+ imediato:(c)=>'<circle cx="38" cy="28" r="17" stroke="'+c+'"/><path d="M38 17 V28 L46 33" stroke="'+FIG+'"/>'
+   +'<path d="M70 18 V40 M60 29 H80" stroke="'+c+'"/>'
+   +'<path d="M38 7 V11" stroke="'+SOLO+'" stroke-width="1.8"/>',
+ teste:(c)=>'<rect x="12" y="12" width="26" height="34" rx="2" stroke="'+FIG+'"/>'
+   +'<path d="M18 22 H32 M18 29 H32 M18 36 H26" stroke="'+SOLO+'" stroke-width="1.8"/>'
+   +'<path d="M48 46 Q60 20 72 46 Q80 32 90 44" stroke="'+c+'"/>'
+   +'<circle cx="48" cy="46" r="2.4" fill="'+c+'" stroke="none"/><circle cx="72" cy="46" r="2.4" fill="'+c+'" stroke="none"/>',
+ tempo:(c)=>'<path d="M30 20 V40" stroke="'+c+'"/><path d="M22 20 H52" stroke="'+c+'"/>'
+   +'<path d="M62 18 Q78 18 78 28 Q78 40 62 40 Z" stroke="'+FIG+'"/><circle cx="70" cy="29" r="3" stroke="'+SOLO+'" stroke-width="1.6"/>'
+   +'<path d="M14 46 H86" stroke="'+SOLO+'" stroke-width="1.6" stroke-dasharray="3 4"/>',
+ troca:(c)=>'<path d="M16 22 H70" stroke="'+c+'"/><path d="M62 15 L70 22 L62 29" stroke="'+c+'"/>'
+   +'<path d="M84 40 H30" stroke="'+FIG+'"/><path d="M38 33 L30 40 L38 47" stroke="'+FIG+'"/>'
+   +'<circle cx="86" cy="18" r="4.5" stroke="'+SOLO+'" stroke-width="1.8"/><circle cx="14" cy="44" r="4.5" stroke="'+SOLO+'" stroke-width="1.8"/>',
+ invasao:(c)=>'<rect x="60" y="10" width="22" height="30" rx="2" stroke="#E05252" fill="#3A1A1A"/>'
+   +'<path d="M12 44 L12 30 Q12 24 20 24 L34 24 L44 34 L44 44 Z" stroke="'+FIG+'"/>'
+   +'<path d="M46 20 L54 14 M48 28 L58 26" stroke="#E05252" stroke-width="1.8"/>',
+ calend:(c)=>'<rect x="14" y="14" width="72" height="34" rx="2" stroke="'+FIG+'"/><path d="M14 24 H86" stroke="'+FIG+'"/>'
+   +'<path d="M30 10 V18 M70 10 V18" stroke="'+SOLO+'" stroke-width="1.8"/>'
+   +'<rect x="21" y="29" width="9" height="6" fill="'+c+'" stroke="none"/><rect x="35" y="29" width="9" height="6" fill="'+c+'" stroke="none"/>'
+   +'<rect x="49" y="29" width="9" height="6" fill="'+c+'" stroke="none"/><rect x="63" y="29" width="9" height="6" fill="'+c+'" stroke="none"/>'
+   +'<rect x="21" y="39" width="9" height="6" fill="'+c+'" stroke="none"/><rect x="35" y="39" width="9" height="6" fill="'+c+'" stroke="none"/>'
+   +'<rect x="49" y="39" width="9" height="6" fill="'+SOLO+'" stroke="none"/>',
+ viagem:(c)=>'<path d="M10 38 L86 22 L74 34 L82 44 L62 38 L48 46 L50 34 Z" stroke="'+c+'"/>'
+   +'<path d="M20 14 A9 9 0 1 0 20 30 A11 11 0 1 1 20 14 Z" stroke="'+SOLO+'" stroke-width="1.8"/>',
+ scout:(c)=>'<circle cx="32" cy="32" r="13" stroke="'+c+'"/><circle cx="68" cy="32" r="13" stroke="'+c+'"/>'
+   +'<path d="M45 30 H55" stroke="'+c+'"/><path d="M26 19 L30 11 H40 L38 19 M74 19 L70 11 H60 L62 19" stroke="'+FIG+'"/>'
+   +'<path d="M27 36 L32 28 L37 34" stroke="'+SOLO+'" stroke-width="1.8"/>',
+ diretoria:(c)=>'<path d="M16 44 L30 16 L44 44 Z" stroke="'+c+'"/><path d="M44 24 L62 16 V44 L44 36 Z" stroke="'+c+'"/>'
+   +'<path d="M68 20 Q78 24 68 28 M70 32 Q82 36 70 40" stroke="'+FIG+'" stroke-width="1.8"/>'
+   +'<path d="M16 30 H30" stroke="'+SOLO+'" stroke-width="1.6"/>',
+ acelerado:(c)=>'<circle cx="62" cy="28" r="14" stroke="'+FIG+'"/>'
+   +'<path d="M50 20 Q62 28 50 36 M62 14 Q70 28 62 42" stroke="'+SOLO+'" stroke-width="1.6"/>'
+   +'<path d="M10 16 H34 M6 28 H28 M10 40 H34" stroke="'+c+'"/>',
+ saque:(c)=>'<circle cx="24" cy="14" r="6" stroke="'+c+'"/>'
+   +'<path d="M30 18 Q56 10 76 44" stroke="'+c+'" stroke-width="1.8" stroke-dasharray="5 4"/>'
+   +'<circle cx="52" cy="38" r="5" stroke="'+FIG+'"/><path d="M52 43 L50 52 M52 41 L42 34 M52 41 L62 36" stroke="'+FIG+'"/>',
+};
+/* ── arte gerada, com o vetor como reserva ──────────────────────────────────
+   IMG é preenchido no momento de publicar com as URLs dos assets. Se faltar uma
+   entrada, ou se a imagem não carregar, a carta cai no desenho vetorial em vez de
+   ficar com um buraco — o jogo continua jogável offline e sem as imagens. */
+const IMG = {
+ marina:"arte/marina.jpg",  bianca:"arte/bianca.jpg",
+ juliana:"arte/juliana.jpg",  leticia:"arte/leticia.jpg",
+ rafaela:"arte/rafaela.jpg",  camila:"arte/camila.jpg",
+ paula:"arte/paula.jpg",  fernanda:"arte/fernanda.jpg",
+ helena:"arte/helena.jpg",  isadora:"arte/isadora.jpg",
+ eliza:"arte/eliza.jpg",  mariana:"arte/mariana.jpg",
+ forca:"arte/forca.jpg",  plio:"arte/plio.jpg",
+ propri:"arte/propri.jpg",  core:"arte/core.jpg",
+ ombro:"arte/ombro.jpg",  recup:"arte/recup.jpg",
+ sono:"arte/sono.jpg",  nutri:"arte/nutri.jpg",
+ descarga:"arte/descarga.jpg",  crio:"arte/crio.jpg",
+ fisio:"arte/fisio.jpg",  reab:"arte/reab.jpg",
+ peace:"arte/peace.jpg",  banda:"arte/banda.jpg",
+ imediato:"arte/imediato.jpg",  teste:"arte/teste.jpg",
+ tempo:"arte/tempo.jpg",  troca:"arte/troca.jpg",
+ invasao:"arte/invasao.jpg",
+ coletivo:"arte/coletivo.jpg",  calend:"arte/calend.jpg",
+ aquecimento:"arte/aquecimento.jpg",
+ tatatq:"arte/tatatq.jpg",  tatdef:"arte/tatdef.jpg",
+ viagem:"arte/viagem.jpg",  scout:"arte/scout.jpg",
+ diretoria:"arte/diretoria.jpg",  acelerado:"arte/acelerado.jpg",
+ saque:"arte/saque.jpg",
+};
+function arteDe(id, rot, vetor){
+  const u = IMG[id];
+  if(!u) return vetor();
+  const im = document.createElement("img");
+  im.className = "arte"; im.src = u; im.alt = rot;
+  im.loading = "lazy"; im.decoding = "async";
+  im.addEventListener("error", ()=>{ try{ im.replaceWith(vetor()); }catch(e){} }, {once:true});
+  return im;
+}
+
+function arteAcao(id){
+  const c = ACAO[id];
+  return arteDe(id, c ? c.nm : "", ()=>{
+    const f = ARTE[id];
+    return f ? svgArte(f(COR_T[c.t]), c.nm) : svgArte('', c ? c.nm : "");
+  });
+}
+function arteAtleta(a){
+  const ac = a.pos==="ATQ" ? "#F0803C" : "#4A9BE0";
+  return arteDe(a.id, a.nm+", "+a.fn, ()=>svgArte(poseAtleta(a.pose, ac, a.n), a.nm+", "+a.fn));
+}
+
+/* ══════════════════════ ESTADO ══════════════════════
+   Informação aberta, exceto a escalação. Consequência direta do mercado virado para
+   cima: o adversário viu você pegar as cartas, então esconder a mão seria teatro.
+   O que continua escondido é o NÚMERO exato da razão — a zona é pública, a casa
+   decimal se compra com Teste funcional ou Scouting. É o que mantém de pé as cartas
+   de informação, e o que faz a Invasão na linha central valer um scout. */
+let S = null;
+let VENDO_CATALOGO = false;
+let VENDO_REGRAS = false;
+let VENDO_PAINEL = false;
+let PAINEL_NOMES = false;   /* anônimo por padrão: o que se projeta é a decisão, não o grupo */
+
+function embaralha(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const k=Math.floor(Math.random()*(i+1)); [a[i],a[k]]=[a[k],a[i]]; }
+  return a;
+}
+function instancia(cid){
+  const c = ATL[cid];
+  return {id:c.id, nm:c.nm, fn:c.fn, pos:c.pos, base:c.base, cro:c.cro, n:c.n, pose:c.pose,
+          hab:c.hab, pas:c.pas, mods:c.mods,
+          progs:[], lesao:0, tmp:{}, hist:Array(6).fill(c.cro),
+          serie:[], eventos:[], revelada:false,
+          fat: FAT[cid] != null ? FAT[cid] : 1,
+          fatHoje: null,    /* sorteado no início da rodada */
+          pseVisto: null,   /* último fator que o grupo mediu — alimenta a projeção */
+          pse: []};
+}
+function novoJogador(i, nome){
+  return {i, nome:nome, verba:VERBA_PRE, elenco:[], mao:[], ordem:[], energia:0,
+          pontos:[0,0], vitorias:0, quadra:{}, pendEnergia:0, limiteEnergia:null,
+          scout:false, prontoPre:false};
+}
+function iniciar(n1, n2){
+  S = {fase:"pretemporada", rodada:0, atual:0, primeiro:0,
+       j:[novoJogador(0, n1||"Grupo A"), novoJogador(1, n2||"Grupo B")],
+       deck:embaralha(montarDeck()), mercado:[], vezMercado:0, levadas:0,
+       passe:null, log:[], duelos:[], di:0, jogo:0, fim:null, sel:null, avisos:[]};
+  for(const j of S.j) j.elenco = ATLETAS.map(a=>instancia(a.id));
+  log("Pré-temporada: "+VERBA_PRE+" de verba para instalar estrutura. Os dois elencos são idênticos.");
+  render();
+}
+function log(txt, quem){ S.log.unshift({txt, quem, r:SEQ[S.rodada]?SEQ[S.rodada].r:"PRÉ"}); }
+const adv = (i)=>S.j[1-i];
+const rodadaAtual = ()=>SEQ[S.rodada];
+
+/* ══════════════════════ FAIXA DE ESTADO ══════════════════════ */
+function renderHud(){
+  const h = $("#hud");
+  if(VENDO_CATALOGO && !S){ h.hidden = true; return; }
+  if(!S){ h.hidden = true; return; }
+  h.hidden = false;
+  const tl = $("#tl"); tl.textContent = "";
+  SEQ.forEach((s,i)=>{
+    const i2 = el("i","",s.r);
+    if(s.k==="J") i2.classList.add("jogo");
+    if(i < S.rodada) i2.classList.add("feita");
+    if(i === S.rodada && S.fase!=="pretemporada") i2.classList.add("atual");
+    tl.appendChild(i2);
+  });
+  const d = $("#huddir"); d.textContent = "";
+  for(const j of S.j){
+    const p = el("span","pill", j.nome+"  "+j.vitorias+"V");
+    if(S.fase!=="pretemporada" && S.fase!=="relatorio") p.textContent += "  ⚡"+j.energia;
+    d.appendChild(p);
+  }
+  const br = el("button","ghost","Regras");
+  br.style.padding="3px 10px"; br.style.fontSize="12px";
+  br.onclick = ()=>{ VENDO_REGRAS = true; render(); };
+  d.appendChild(br);
+  const b = el("button","ghost","Cartas");
+  b.style.padding="3px 10px"; b.style.fontSize="12px";
+  b.onclick = ()=>{ VENDO_CATALOGO = true; render(); };
+  d.appendChild(b);
+}
+
+/* ══════════════════════ CARTAS NA TELA ══════════════════════ */
+function cartaAtleta(a, o){
+  o = o || {};
+  const w = el("div","atl "+a.pos);
+  if(o.sel) w.classList.add("sel");
+  if(!disponivel(a)) w.classList.add("fora");
+  if(o.clic){ w.classList.add("clic"); w.tabIndex=0; w.onclick=o.clic;
+    w.onkeydown=(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); o.clic(); } }; }
+  if(o.arte !== false) w.appendChild(arteAtleta(a));
+  const top = el("div","row"); top.style.justifyContent="space-between"; top.style.gap="6px";
+  const nn = el("div");
+  nn.appendChild(el("div","nm",a.nm));
+  nn.appendChild(el("div","pos",a.fn+" · "+a.pos));
+  top.appendChild(nn);
+  const r = razao(a);
+  const z = el("span","zona z-"+zona(r), rotuloZona(r));
+  top.appendChild(z);
+  w.appendChild(top);
+
+  if(o.proj !== false && S && S.fase !== "duelos"){
+    const pr = projetar(a);
+    const alvo = proxJogo();
+    if(pr !== null && alvo){
+      const pz = zona(pr);
+      const lin = el("div","proj z-"+pz);
+      lin.textContent = "no "+alvo+": "+rotuloZona(pr)+"  ("+pr.toFixed(2)+")";
+      if(pz !== "verde") lin.classList.add("alerta");
+      w.appendChild(lin);
+    }
+  }
+
+  const meta = el("div","meta");
+  const esq = el("div");
+  esq.appendChild(el("div","big", String(atributo(a))));
+  esq.appendChild(el("div","lbl", a.pos==="ATQ"?"ataque":"defesa"));
+  meta.appendChild(esq);
+  const dir = el("div"); dir.style.textAlign="right";
+  if(o.mostraRazao || a.revelada){
+    dir.appendChild(el("div","num", "razão "+r.toFixed(2)));
+  } else {
+    dir.appendChild(el("div","num faint", "razão ?"));
+  }
+  const ci = cargaIndividual(a);
+  const dono = donoDe(a);
+  const presc = cargaPrescrita(a, dono);
+  if(o.mostraRazao || a.revelada){
+    const ln = el("div","num pse");
+    ln.appendChild(el("span","","carga "+nf(presc)+" → "));
+    if(dono && dono.pseAberta && a.fatHoje != null){
+      const v = el("span","psev", nf(cargaReal(a,dono)));
+      v.title = "carga interna medida · fator "+a.fatHoje.toFixed(2);
+      ln.appendChild(v);
+    } else {
+      const q = el("span","pseq","?");
+      q.title = "carga interna não medida nesta rodada";
+      ln.appendChild(q);
+    }
+    dir.appendChild(ln);
+  } else {
+    dir.appendChild(el("div","num faint", "carga "+nf(presc)+"/rod"));
+  }
+  if(ci) dir.appendChild(el("div","num faint", CARGA_COLETIVA+" coletivo + "+ci+" individual"));
+  if(o.mostraCro) dir.appendChild(el("div","num faint","crônica inicial "+a.cro));
+  meta.appendChild(dir);
+  w.appendChild(meta);
+
+  if(a.progs.length){
+    const ps = el("div","progs");
+    for(const p of a.progs) ps.appendChild(el("span","",ACAO[p].nm));
+    w.appendChild(ps);
+  }
+  if(a.lesao){
+    w.appendChild(el("div","lesao", a.lesao>=3 ? "LESIONADA — fora do jogo"
+      : "LESÃO "+a.lesao+" de 3 · −"+a.lesao+" no atributo"));
+  }
+  const lb = el("div","lesbar");
+  for(let i=0;i<3;i++){ const b=el("b"); if(i<a.lesao) b.classList.add("on"); lb.appendChild(b); }
+  w.appendChild(lb);
+  if(o.info !== false && S){
+    const i = el("button","info","i");
+    i.title = "Situação de carga de "+a.nm;
+    i.setAttribute("aria-label","Detalhes de "+a.nm);
+    i.onclick = (e)=>{ e.stopPropagation(); e.preventDefault(); abrirFicha("atleta", a.id); };
+    w.appendChild(i);
+  }
+  if(o.hab && (a.hab!=="—" || a.pas!=="—")){
+    const t = el("div"); t.style.marginTop="7px"; t.style.fontSize="11.5px";
+    if(a.hab!=="—"){ const x=el("div","",a.hab); x.style.color="var(--verde)"; t.appendChild(x); }
+    if(a.pas!=="—"){ const y=el("div","",a.pas); y.style.color="var(--ambar)"; t.appendChild(y); }
+    w.appendChild(t);
+  }
+  return w;
+}
+
+function cartaAcao(id, o){
+  o = o || {};
+  const c = ACAO[id];
+  const w = el(o.clic ? "button" : "div", "ct "+c.t);
+  if(!o.clic) w.classList.add("estatica");
+  if(o.no) w.classList.add("no");
+  if(o.sel) w.classList.add("sel");
+  if(o.clic && !o.no) w.onclick = o.clic;
+  if(o.clic && o.no) w.disabled = true;
+  if(o.arte !== false) w.appendChild(arteAcao(id));
+  w.appendChild(el("div","tp", c.t));
+  w.appendChild(el("div","nm", c.nm));
+  w.appendChild(el("div","tx", c.tx));
+  const pe = el("div","row"); pe.style.gap="7px"; pe.style.marginTop="auto";
+  if(c.cg) pe.appendChild(el("span","cg","+"+c.cg+" de carga por rodada"));
+  if(c.t==="PROGRAMA") pe.appendChild(el("span","num faint","· fica em jogo"));
+  if(c.alvo==="x")     pe.appendChild(el("span","num","alcance X"));
+  if(c.alvo==="todas") pe.appendChild(el("span","num","ELENCO INTEIRO"));
+  if(c.quando==="jogo") pe.appendChild(el("span","num faint","só no jogo"));
+  if(c.soPos) pe.appendChild(el("span","num faint","só "+c.soPos));
+  w.appendChild(pe);
+  w.appendChild(el("div","cst", rotuloCusto(c)));
+  if(o.info !== false && S){
+    const i = el("button","info","i");
+    i.title = "O que esta carta faz";
+    i.setAttribute("aria-label","Detalhes de "+c.nm);
+    i.onclick = (e)=>{ e.stopPropagation(); e.preventDefault(); abrirFicha("acao", c.id); };
+    w.appendChild(i);
+  }
+  if(o.copias) w.appendChild(el("div","cop", c.cop+"×"));
+  return w;
+}
+function barra(p, cor){
+  const b = el("div","bar"); const i = el("i");
+  i.style.width = Math.round(p*100)+"%"; i.style.background = cor; b.appendChild(i); return b;
+}
+function linhaProb(rot, p, cor){
+  const w = el("div");
+  const t = el("div","row"); t.style.justifyContent="space-between"; t.style.gap="6px";
+  t.appendChild(el("span","lbl",rot));
+  t.appendChild(el("span","num",pct(p)));
+  w.appendChild(t); w.appendChild(barra(p,cor)); return w;
+}
+
+/* ══════════════════════ GUIA · O QUE FAZER AGORA ══════════════════════
+   A faixa fica sempre visível com uma frase no imperativo. O painel abre sozinho na
+   primeira vez que você chega numa fase e depois fica atrás do "?" — porque na segunda
+   partida ninguém quer ler de novo, e na primeira ninguém sabe o que fazer. */
+const GUIA = {
+ pretemporada:{
+  titulo:"Pré-temporada — onde investir as horas que você tem",
+  agora:"Instale programas nas atletas que você pretende usar. Depois toque em PRONTO.",
+  passos:[
+   "<b>Todas começam em DOSE CERTA porque ainda não treinaram nada — ignore isso.</b> Olhe a linha <b>\"no J1\"</b> de cada carta: ela diz onde a atleta vai estar no dia de jogo se você não fizer nada.",
+   "Você tem "+VERBA_PRE+" de verba e "+ATLETAS.length+" atletas. <b>Não dá para cobrir todas</b> — escolher é o ponto da fase.",
+   "Toque num programa lá embaixo e depois nas atletas que vão recebê-lo. As cartas marcadas <b>alcance X</b> deixam você escolher quantas, e o preço sobe a cada uma.",
+   "<b>O time treina junto:</b> toda atleta já recebe "+CARGA_COLETIVA+" de carga por rodada sem carta nenhuma. Programa é trabalho individual <b>por cima</b> disso.",
+   "Por isso a maioria já chega bem ao jogo só com o coletivo. Quem precisa de individual são as de <b>crônica alta</b> — elas treinam pouco com o grupo e chegam destreinadas. E cuidado ao contrário: quem já está no limite com o coletivo <b>estoura</b> com um programa a mais.",
+   "Cada programa cobra manutenção em energia toda rodada. Instalar o que você não consegue manter faz o ganho se perder.",
+   "<b>Uma coisa que você ainda não sabe:</b> o mesmo treino custa diferente para cada atleta. A crônica inicial da carta dá uma pista, mas só uma — há veterana que paga caro e novata que paga barato. Isso só se descobre medindo a PSE, nas rodadas de treino."],
+  decisao:"Quais seis ou sete atletas você vai realmente desenvolver — e quais vai deixar no banco sabendo o preço disso?"},
+ mercado:{
+  titulo:"Mercado — as cartas da semana",
+  agora:"É a vez de quem está em destaque escolher. Toque numa carta virada para levá-la.",
+  passos:[
+   "Seis cartas viradas para cima. Os dois grupos levam <b>três cada, um por vez, alternando</b>.",
+   "Está tudo à vista de propósito: a sorte é a mesma para os dois, e o que sobra de diferença é escolha.",
+   "Carta levada vai para a mão e pode ser guardada para rodadas seguintes. O limite de mão é 8.",
+   "Toque no <b>ⓘ</b> de qualquer carta para ver o que ela faz e por que ela existe."],
+  decisao:"Você precisa desta carta, ou só não quer que o adversário tenha?"},
+ treino:{
+  titulo:"Treino — gastar a energia da semana",
+  agora:"Jogue cartas da sua mão nas suas atletas. Depois toque em TERMINAR.",
+  passos:[
+   "Você tem 6 de energia, menos a manutenção dos programas já instalados. <b>Energia não acumula</b> — o que sobrar se perde.",
+   "Toque numa carta da mão, depois na atleta alvo. Carta de <b>alcance X</b>: marque quantas quiser e veja o custo subir.",
+   "Olhe a <b>zona</b> de cada atleta. Verde é dose certa. Vermelho é destreinada OU sobrecarregada — os dois machucam.",
+   "<b>O número de carga é o que você PRESCREVEU, não o que ela pagou.</b> Cada atleta responde ao mesmo treino com um custo diferente — é a carga interna. Para saber, <b>colha a PSE da sessão</b> (1 ⚡). Medir não corrige nada: depois de medir você ainda precisa gastar para ajustar.",
+   "Enquanto você não medir, a linha <b>\"no J1\"</b> supõe que todas pagam 1,00× — e algumas pagam bem mais.",
+   "Toque no <b>ⓘ</b> de uma atleta para ver a curva dela e o que fazer a respeito.",
+   "<b>Pode haver lesão no treino, não só no jogo.</b> É assim na vida real, e é o motivo de monitorar carga — quem fica em sobrecarga por três rodadas costuma pagar antes de entrar em quadra."],
+  decisao:"Quem precisa de mais carga, quem precisa de menos, e vale 1 de energia para saber o que elas realmente pagaram?"},
+ escalacao:{
+  titulo:"Dia de jogo — escalação secreta",
+  agora:"Monte sua quadra. O adversário não pode ver esta tela.",
+  passos:[
+   "Toque numa posição da quadra e depois na atleta que vai ocupá-la.",
+   "Cada posição <b>pede uma função</b>. Escalar fora da função é improviso: custa atributo e aumenta o risco.",
+   "Sua rede enfrenta o fundo do adversário na <b>diagonal</b>, como um ataque cruzado de verdade.",
+   "Quem está em zona vermelha pode render ponto e sair lesionada no mesmo duelo."],
+  decisao:"Escalar a titular sobrecarregada, ou improvisar com alguém fora de função para protegê-la?"},
+ duelos:{
+  titulo:"Duelos — a conta ficando visível",
+  agora:"Confira as chances, jogue cartas de jogo se quiser, e resolva.",
+  passos:[
+   "<b>Demanda</b> é o ataque. <b>Capacidade</b> é a defesa. A diferença entre as duas vira chance de ponto e chance de lesão.",
+   "As probabilidades aparecem <b>antes</b> de você confirmar. Você decide sabendo o risco que está aceitando.",
+   "Os dois lados podem intervir antes de resolver: bandagem, atendimento imediato, tempo técnico.",
+   "Risco é probabilidade, não destino. Ninguém se machucar <b>não</b> prova que a dose estava certa."],
+  decisao:"Esse risco você aceita?"},
+};
+function barraGuia(fase){
+  const box = $("#guia"); box.textContent = "";
+  const g = GUIA[fase];
+  if(!g || !S || S.passe){ box.hidden = true; return; }
+  box.hidden = false;
+  if(!S.guiaVisto) S.guiaVisto = {};
+  if(!S.guiaVisto[fase]){ S.guiaVisto[fase] = true; S.guiaAberto = fase; }
+  const aberto = S.guiaAberto === fase;
+  box.classList.toggle("aberto", aberto);
+
+  const bar = el("div","gbar");
+  bar.setAttribute("role","button"); bar.tabIndex = 0;
+  bar.appendChild(el("span","ico","?"));
+  const tx = el("div","tx"); tx.innerHTML = "<b>"+g.agora+"</b>"; bar.appendChild(tx);
+  bar.appendChild(el("span","ab", aberto ? "fechar" : "como funciona"));
+  const alterna = ()=>{ S.guiaAberto = aberto ? null : fase; render(); };
+  bar.onclick = alterna;
+  bar.onkeydown = (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); alterna(); } };
+  box.appendChild(bar);
+
+  if(aberto){
+    const p = el("div","gpan");
+    p.appendChild(el("h3","",g.titulo));
+    const ol = el("ol");
+    for(const s of g.passos){ const li = el("li"); li.innerHTML = s; ol.appendChild(li); }
+    p.appendChild(ol);
+    const d = el("div","dec");
+    d.appendChild(el("b","","a decisão desta fase"));
+    d.appendChild(document.createTextNode(g.decisao));
+    p.appendChild(d);
+    box.appendChild(p);
+  }
+}
+
+/* ══════════════════════ FICHA DE DETALHE ══════════════════════
+   Toque e não passagem de mouse: o jogo roda em celular na mão do aluno. */
+function conselho(a){
+  const r = razao(a), pr = projetar(a), alvo = proxJogo();
+  /* O conselho é sobre ONDE ELA VAI PARAR, não sobre onde está. Na pré-temporada todas
+     estão em dose certa e mesmo assim quase todas precisam de intervenção. */
+  if(pr !== null && alvo){
+    const n = rodadasAteJogo();
+    const resta = n + " rodada" + (n>1?"s":"") + " de treino até o " + alvo;
+    if(pr < .8) return ["Do jeito que está, ela chega ao " + alvo + " em razão " + pr.toFixed(2)
+      + " — DESTREINADA, que machuca tanto quanto treinar demais.\n\nEla precisa de MAIS carga, "
+      + "não de descanso: instale um programa nela, ou aumente o que ela já tem. ("+resta+".)", "var(--vermelho)"];
+    if(pr > 1.45) return ["Do jeito que está, ela chega ao " + alvo + " em razão " + pr.toFixed(2)
+      + " — SOBRECARREGADA.\n\nTire carga dela: dispense um programa, ou guarde uma Descarga "
+      + "planejada para jogar na rodada antes do jogo. ("+resta+".)", "var(--vermelho)"];
+    if(pr > 1.25) return ["Chega ao " + alvo + " em " + pr.toFixed(2) + ", na faixa de atenção. "
+      + "Ainda dá para corrigir sem perder nada: segure a carga, ou um Aquecimento específico "
+      + "antes do jogo compensa parte do risco. ("+resta+".)", "var(--ambar)"];
+    return ["Do jeito que está, ela chega ao " + alvo + " em razão " + pr.toFixed(2)
+      + " — dose certa.\n\nNÃO PRECISA FAZER NADA COM ELA. Gaste a energia em quem está fora "
+      + "da faixa, e volte aqui se mudar alguma coisa. ("+resta+".)", "var(--verde)"];
+  }
+  if(r < .8) return ["Chegou ao jogo DESTREINADA. Nesta altura não há o que fazer por ela "
+    + "hoje — a decisão agora é escalar mesmo assim ou improvisar com outra.", "var(--vermelho)"];
+  if(r <= 1.25) return ["Na faixa, e chegou bem ao jogo. Pode escalar.", "var(--verde)"];
+  if(r <= 1.45) return ["Em atenção no dia de jogo. Bandagem ou atendimento imediato reduzem "
+    + "o estrago se der ruim.", "var(--ambar)"];
+  return ["Sobrecarregada no dia de jogo. Escalar é aceitar um risco alto de perdê-la; "
+    + "a outra saída é improvisar com alguém fora de função.", "var(--vermelho)"];
+}
+function abrirFicha(k, id){ S.info = {k, id}; render(); }
+function renderFicha(){
+  const box = $("#ficha");
+  box.textContent = "";
+  if(!S || !S.info){ box.hidden = true; return; }
+  box.hidden = false;
+  box.onclick = (e)=>{ if(e.target === box){ S.info = null; render(); } };
+  const sh = el("div","sheet");
+  sh.appendChild(el("div","alca"));
+
+  if(S.info.k === "acao"){
+    const c = ACAO[S.info.id];
+    sh.appendChild(el("div","lbl", c.t + " · custo " + rotuloCusto(c)));
+    sh.appendChild(el("h2","", c.nm));
+    sh.appendChild(el("p","", c.tx));
+    const linhas = [];
+    if(c.alvo==="x")      linhas.push(["Alcance","Você escolhe quantas atletas. O custo sobe a cada uma"+(c.custoBase?", mais "+c.custoBase+" de base":"")+"."]);
+    if(c.alvo==="todas")  linhas.push(["Alcance","Elenco inteiro, sem escolher. Vale para todas as suas atletas, inclusive as que não aguentam."]);
+    if(c.alvo==="atleta") linhas.push(["Alcance","Uma atleta. Efeito profundo em troca de não espalhar."]);
+    if(c.cg)              linhas.push(["Carga","+"+c.cg+" por rodada em cada atleta que receber. "
+      + "Carga é o que faz a atleta evoluir E o que a machuca: esse número entra na conta da razão "
+      + "aguda:crônica toda rodada, e é por isso que mais programa nem sempre é melhor."]);
+    if(!c.cg && c.t==="PROGRAMA") linhas.push(["Carga","Nenhuma. Este programa não soma carga — "
+      + "protege sem cobrar nada do tecido."]);
+    if(c.t==="PROGRAMA")  linhas.push(["Manutenção","Fica em jogo e cobra energia toda rodada. Sem energia, o programa cai e o ganho se perde."]);
+    if(c.quando==="jogo") linhas.push(["Quando","Só no dia de jogo, durante os duelos."]);
+    if(c.soPos)           linhas.push(["Restrição","Só em atletas de "+(c.soPos==="ATQ"?"ataque":"defesa")+"."]);
+    for(const [k2,v] of linhas){
+      const s = el("div","fseg"); s.appendChild(el("span","lbl",k2));
+      s.appendChild(document.createTextNode(v)); sh.appendChild(s);
+    }
+    if(POR_QUE[c.id]){
+      const s = el("div","conselho");
+      s.appendChild(el("div","lbl","por que esta carta existe"));
+      s.appendChild(document.createTextNode(POR_QUE[c.id]));
+      sh.appendChild(s);
+    }
+  } else {
+    let a = null;
+    for(const j of S.j){ const x = j.elenco.find(y=>y.id===S.info.id); if(x && (!a || j.i===S.atual)) a = x; }
+    if(!a) a = instancia(S.info.id);
+    const r = razao(a);
+    sh.appendChild(el("div","lbl", a.fn + " · " + (a.pos==="ATQ"?"ataque":"defesa")));
+    sh.appendChild(el("h2","", a.nm));
+    const topo = el("div","row");
+    topo.appendChild(el("span","zona z-"+zona(r), rotuloZona(r)));
+    topo.appendChild(el("span","pill", (a.pos==="ATQ"?"ataque ":"defesa ")+atributo(a)));
+    topo.appendChild(el("span","pill","razão "+r.toFixed(2)));
+    topo.appendChild(el("span","pill","carga "+cargaRodada(a)+"/rodada"));
+    topo.appendChild(el("span","pill faint", CARGA_COLETIVA+" do treino coletivo + "+cargaIndividual(a)+" individual"));
+    sh.appendChild(topo);
+    const [txt,cor] = conselho(a);
+    const cj = el("div","conselho"); cj.style.borderLeftColor = cor;
+    cj.style.whiteSpace = "pre-line";
+    cj.appendChild(el("div","lbl","o que fazer com ela agora"));
+    cj.appendChild(document.createTextNode(txt));
+    sh.appendChild(cj);
+    if(a.serie && a.serie.length){
+      const cv = el("div","curva");
+      cv.appendChild(el("div","lbl","laranja = carga aguda · azul tracejado = crônica"));
+      cv.appendChild(curvaSVG(a)); sh.appendChild(cv);
+    }
+    const seg = (k2,v,cor2)=>{ const s=el("div","fseg"); if(cor2) s.style.borderLeftColor=cor2;
+      s.appendChild(el("span","lbl",k2)); s.appendChild(document.createTextNode(v)); sh.appendChild(s); };
+    seg("Crônica inicial", a.cro + " — é a carga a que ela já está adaptada. Define a margem que ela tem para treinar.");
+    {
+      const dono = donoDe(a);
+      const presc = cargaPrescrita(a, dono);
+      if(dono && dono.pseAberta && a.fatHoje != null){
+        seg("Carga desta rodada", "prescrita " + nf(presc) + "  →  paga " + nf(cargaReal(a,dono))
+          + "   (fator " + a.fatHoje.toFixed(2) + "×)\n"
+          + "O número da direita é o que entra na razão aguda:crônica. O da esquerda é só o que você pediu.",
+          "var(--cyan)");
+      } else {
+        seg("Carga desta rodada", "prescrita " + nf(presc) + "  →  paga ?\n"
+          + (a.pseVisto != null
+             ? "Da última vez que você mediu, ela pagou " + a.pseVisto.toFixed(2) + "×. A projeção está usando esse valor."
+             : "Você nunca mediu a PSE dela. A projeção está supondo 1,00× — e pode estar otimista."),
+          "var(--ambar)");
+      }
+    }
+    if(a.hab !== "—") seg("Habilidade", a.hab, "var(--verde)");
+    if(a.pas !== "—") seg("Passivo", a.pas, "var(--ambar)");
+    if(a.progs.length) seg("Programas", a.progs.map(p=>ACAO[p].nm).join(" · "));
+    if(a.lesao) seg("Lesão", a.lesao + " de 3" + (a.lesao>=3 ? " — fora do jogo" : ""), "var(--vermelho)");
+  }
+  const b = el("button","pri","Fechar");
+  b.onclick = ()=>{ S.info = null; render(); };
+  sh.appendChild(b);
+  box.appendChild(sh);
+}
+
+/* ══════════════════════ DESPACHO DE TELA ══════════════════════ */
+function render(){
+  const app = $("#app"); app.textContent = "";
+  renderHud();
+  if(VENDO_CATALOGO || VENDO_REGRAS || VENDO_PAINEL){
+    $("#guia").hidden = true; $("#ficha").hidden = true;
+    if(VENDO_PAINEL) return telaPainel(app);
+    return VENDO_REGRAS ? telaRegras(app) : telaCatalogo(app);
+  }
+  barraGuia(S ? S.fase : null);
+  renderFicha();
+  if(!S) return telaIntro(app);
+  if(S.passe) return telaPasse(app);
+  switch(S.fase){
+    case "pretemporada": return telaPreTemporada(app);
+    case "mercado":      return telaMercado(app);
+    case "treino":       return telaTreino(app);
+    case "escalacao":    return telaEscalacao(app);
+    case "duelos":       return telaDuelos(app);
+    case "resultado":    return telaResultado(app);
+    case "relatorio":    return telaRelatorio(app);
+  }
+}
+function passar(para, txt, ok){ S.passe = {para, txt, ok}; render(); }
+function telaPasse(app){
+  const w = el("div","stack"); w.style.paddingTop="60px"; w.style.textAlign="center";
+  w.appendChild(el("h1","",S.passe.para));
+  const p = el("p","dim",S.passe.txt); p.style.maxWidth="440px"; p.style.margin="0 auto"; w.appendChild(p);
+  const r = el("div","row"); r.style.justifyContent="center"; r.style.marginTop="10px";
+  const b = el("button","pri","Pronto, é minha vez");
+  b.onclick = ()=>{ const f = S.passe.ok; S.passe = null; f(); };
+  r.appendChild(b); w.appendChild(r);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ TELA · INTRO ══════════════════════ */
+function telaIntro(app){
+  const w = el("div","stack"); w.style.paddingTop="34px";
+  w.appendChild(el("h1","","DOSE"));
+  const sub = el("p","dim","Jogo de carga de treinamento. Vôlei, oito rodadas, dois jogos.");
+  sub.style.fontSize="16px"; w.appendChild(sub);
+
+  const c1 = el("div","card stack");
+  c1.style.borderColor = "var(--cyan)";
+  c1.appendChild(el("h2","","A regra que organiza tudo"));
+  c1.appendChild(el("p","","Nenhuma carta escreve lesão. A lesão é sempre consequência de carga mal "
+    +"administrada ou de demanda acima da capacidade. Treinar demais machuca; treinar de menos "
+    +"machuca igual. Ganhar o jogo e acertar a prescrição são a mesma coisa."));
+  w.appendChild(c1);
+
+  const c2 = el("div","card stack");
+  c2.appendChild(el("h2","","Como funciona"));
+  const ul = el("div","stack"); ul.style.gap="7px";
+  [["1 · Pré-temporada","Vocês recebem as MESMAS "+ATLETAS.length+" jogadoras. Com "+VERBA_PRE+" de verba, cada grupo instala programas em quem quiser desenvolver. Não cobre todas: escolher é o ponto."],
+   ["2 · Três rodadas de treino","Em cada uma viram "+MERCADO_VIRADAS+" cartas no mercado e os grupos levam "+ESCOLHAS+" cada, um por vez. Depois gastam 6 de energia tratando o elenco. O time treina junto: todas recebem "+CARGA_COLETIVA+" de carga por rodada de graça, e programa é trabalho individual por cima disso."],
+   ["3 · Dia de jogo","Cada grupo monta a quadra em segredo: seis posições, cada uma pedindo uma função. Revelação simultânea e seis duelos, um por posição."],
+   ["4 · Mais três rodadas e o jogo 2","Quem perdeu o primeiro jogo recebe "+ENERGIA_PERDEDOR+" de energia e escolhe primeiro no mercado."],
+   ["Em toda tela","Uma faixa azul no topo diz o que fazer agora, e o botão i de cada carta abre o que ela faz e por que ela existe."]
+  ].forEach(([t,x])=>{
+    const d = el("div");
+    d.appendChild(el("div","lbl",t));
+    d.appendChild(el("p","dim",x));
+    ul.appendChild(d);
+  });
+  c2.appendChild(ul);
+  w.appendChild(c2);
+
+  const f = el("div","card stack");
+  f.appendChild(el("h3","","Quem está jogando"));
+  const r1 = el("div","row");
+  const i1 = el("input"); i1.type="text"; i1.placeholder="Grupo A"; i1.id="n1";
+  const i2 = el("input"); i2.type="text"; i2.placeholder="Grupo B"; i2.id="n2";
+  r1.appendChild(i1); r1.appendChild(i2); f.appendChild(r1);
+  const r2 = el("div","row");
+  const b = el("button","pri","Começar a pré-temporada");
+  b.onclick = ()=>iniciar(i1.value.trim(), i2.value.trim());
+  r2.appendChild(b);
+  const b3 = el("button","","Ler as regras");
+  b3.onclick = ()=>{ VENDO_REGRAS = true; render(); };
+  r2.appendChild(b3);
+  const b4 = el("button","ghost","Painel da turma");
+  b4.title = "Para quem está conduzindo a aula: junta os resultados das mesas";
+  b4.onclick = ()=>{ VENDO_PAINEL = true; render(); };
+  r2.appendChild(b4);
+  const b2 = el("button","ghost","Ver as "+TOTAL_CARTAS+" cartas");
+  b2.onclick = ()=>{ VENDO_CATALOGO = true; render(); };
+  r2.appendChild(b2);
+  f.appendChild(r2);
+  w.appendChild(f);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ TELA · PRÉ-TEMPORADA ══════════════════════
+   A verba compra ESTRUTURA, não jogadoras. É a decisão real do fisioterapeuta, que
+   não escolhe o elenco e sim onde gastar as horas que tem. */
+function telaPreTemporada(app){
+  const j = S.j[S.atual];
+  const w = el("div","stack");
+  w.appendChild(el("h2","","Pré-temporada · "+j.nome));
+  const av = el("div","aviso");
+  av.textContent = "Instale programas nas atletas que você pretende usar. Verba não cobre as doze — "
+    + "quem fica sem programa não recebe carga, e quem não recebe carga chega destreinada ao jogo.";
+  w.appendChild(av);
+
+  const st = el("div","saldo");
+  const b1 = el("div","b");
+  const v1 = el("div","v"+(j.verba?"":" zero"), String(j.verba));
+  b1.appendChild(v1); b1.appendChild(el("div","lbl","verba restante de "+VERBA_PRE));
+  st.appendChild(b1);
+  const b2 = el("div","b");
+  b2.appendChild(el("div","s", String(totalProgs(j)))); b2.appendChild(el("div","lbl","programas instalados"));
+  st.appendChild(b2);
+  const b3 = el("div","b");
+  b3.appendChild(el("div","s", manutencao(j)+" ⚡")); b3.appendChild(el("div","lbl","manutenção por rodada"));
+  st.appendChild(b3);
+  st.appendChild(el("div","obs","Toda atleta já recebe "+CARGA_COLETIVA
+    +" de carga por rodada do treino coletivo, sem carta. Programa é trabalho individual POR CIMA disso."));
+  w.appendChild(st);
+
+  if(S.sel && S.sel.tipo==="prog"){
+    w.appendChild(painelAlvo(j, adv(S.atual), ACAO[S.sel.id], "verba"));
+    app.appendChild(w); return;
+  }
+
+  const g2 = el("div","mao");
+  for(const c of PROGRAMAS){
+    const no = custoMinimo(c) > j.verba;
+    g2.appendChild(cartaAcao(c.id,{no, clic: no?null:()=>{
+      S.sel = {tipo:"prog", id:c.id, fixo:c.alvo==="todas",
+               escolhidas:c.alvo==="todas" ? alvosAuto(j,c).map(a=>a.id) : []};
+      render(); }}));
+  }
+  const sec = el("div","stack");
+  sec.appendChild(el("div","lbl","Os 8 programas · custo em verba"));
+  sec.appendChild(g2);
+  w.appendChild(sec);
+
+  const sec2 = el("div","stack");
+  sec2.appendChild(el("div","lbl","Seu elenco · as mesmas 12 dos dois lados"));
+  const g3 = el("div","elenco");
+  for(const a of j.elenco) g3.appendChild(cartaAtleta(a,{mostraRazao:true, mostraCro:true, hab:true}));
+  sec2.appendChild(g3);
+  w.appendChild(sec2);
+
+  const r = el("div","row");
+  const b = el("button","pri", S.atual===0 ? "Pronto — passar para "+S.j[1].nome : "Pronto — começar T1");
+  b.onclick = ()=>{
+    j.prontoPre = true;
+    if(S.atual===0){
+      S.atual = 1;
+      passar(S.j[1].nome, "A pré-temporada de "+S.j[0].nome+" está feita. Agora é a sua.", ()=>render());
+    } else {
+      S.fase = "mercado"; S.rodada = 0; iniciaRodada(); render();
+    }
+  };
+  r.appendChild(b);
+  w.appendChild(r);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ ABERTURA DE RODADA ══════════════════════ */
+function cobrarManutencao(j, e){
+  /* Reversibilidade com dentes: instalar mais programa do que se consegue manter faz
+     o ganho se perder. Cai o instalado mais recentemente, para ser explicável. */
+  let m = manutencao(j);
+  while(m > e && j.ordem.length){
+    const ult = j.ordem.pop();
+    const a = j.elenco.find(x=>x.id===ult.aid);
+    if(a){ a.progs = a.progs.filter(p=>p!==ult.pid);
+      log("Sem energia para manter tudo: "+ACAO[ult.pid].nm+" de "+a.nm+" foi perdido. Reversibilidade.", j.i); }
+    m = manutencao(j);
+  }
+  j.manut = m;
+  return Math.max(0, e - m);
+}
+function iniciaRodada(){
+  for(const j of S.j){
+    j.energia = 0;
+    let e = j.perdeu ? ENERGIA_PERDEDOR : ENERGIA_BASE;
+    if(j.limiteEnergia != null){ e = j.limiteEnergia; j.limiteEnergia = null; }
+    e += (j.pendEnergia || 0); j.pendEnergia = 0;
+    e = Math.max(0, e);
+    j.energia = cobrarManutencao(j, e);
+  }
+  S.mercado = [];
+  const n = Math.min(MERCADO_VIRADAS, S.deck.length);
+  for(let i=0;i<n;i++) S.mercado.push({id:S.deck.shift(), levada:null});
+  S.vezMercado = S.primeiro;
+  S.levadas = 0;
+  S.atual = S.primeiro;
+  S.sel = null;
+  sortearFatores();
+  S.fase = S.mercado.length ? "mercado" : "treino";
+}
+const maxPicks = ()=>Math.min(S.mercado.length, 2*ESCOLHAS);
+
+function caixaAvisos(){
+  if(!S.avisos || !S.avisos.length) return null;
+  const w = el("div","card stack");
+  w.style.borderColor = "var(--vermelho)";
+  w.appendChild(el("h3","","Lesões na rodada que acabou"));
+  for(const v of S.avisos){
+    const d = el("div");
+    d.appendChild(el("span","lbl", S.j[v.j].nome + " · "));
+    d.appendChild(document.createTextNode(v.nm + " se lesionou treinando — razão "
+      + v.razao.toFixed(2) + " (" + v.zona + "), " + pct(v.p) + " de risco aceito. Agora em "
+      + v.lesao + " de 3."));
+    w.appendChild(d);
+  }
+  const n = el("p","faint");
+  n.textContent = "A maior parte das lesões por sobrecarga acontece treinando, não jogando — "
+    + "é por isso que se monitora carga. Cartas de cura funcionam a partir de agora.";
+  w.appendChild(n);
+  return w;
+}
+
+/* ══════════════════════ TELA · MERCADO ══════════════════════
+   Viradas para cima de propósito: a sorte fica idêntica para os dois, a negação de
+   carta fica honesta, e é isto que se projeta nas rodadas de treino. */
+function telaMercado(app){
+  const w = el("div","stack");
+  const r = rodadaAtual();
+  const j = S.j[S.vezMercado];
+  w.appendChild(el("h2","","Mercado · "+r.r));
+
+  const av0 = caixaAvisos(); if(av0) w.appendChild(av0);
+  const vez = el("div","vez");
+  vez.appendChild(el("span","lbl","escolhe agora"));
+  vez.appendChild(el("span","q", j.nome));
+  for(const x of S.j){
+    const lv = S.mercado.filter(m=>m.levada===x.i).length;
+    const box = el("div","row"); box.style.gap="6px";
+    box.appendChild(el("span","lbl", x.nome));
+    const cnt = el("div","cnt");
+    for(let k=0;k<ESCOLHAS;k++){ const b=el("b"); if(k<lv) b.classList.add("on"); cnt.appendChild(b); }
+    box.appendChild(cnt);
+    vez.appendChild(box);
+  }
+  vez.appendChild(el("span","num faint","monte: "+S.deck.length+" de "+TOTAL_DECK));
+  w.appendChild(vez);
+
+  const g = el("div","mkt");
+  S.mercado.forEach((m,k)=>{
+    const livre = m.levada===null;
+    const c = cartaAcao(m.id, {clic: livre ? ()=>{
+      m.levada = S.vezMercado;
+      S.j[S.vezMercado].mao.push(m.id);
+      log(S.j[S.vezMercado].nome+" levou "+ACAO[m.id].nm+".", S.vezMercado);
+      S.levadas++;
+      S.vezMercado = 1 - S.vezMercado;
+      if(S.levadas >= maxPicks()){ S.fase="treino"; S.atual=S.primeiro; }
+      render();
+    } : null, no:!livre});
+    if(!livre){
+      c.classList.add("levada");
+      const q = el("div","quem", S.j[m.levada].nome);
+      q.style.background = m.levada===0 ? "#2A3F4A" : "#3A2F4A";
+      c.appendChild(q);
+    }
+    g.appendChild(c);
+  });
+  w.appendChild(g);
+
+  const n = el("p","faint");
+  n.textContent = "Cada grupo leva "+ESCOLHAS+", um por vez. Quem escolhe primeiro nesta rodada: "
+    + S.j[S.primeiro].nome + (S.j[S.primeiro].perdeu ? " (perdeu o último jogo)" : "") + ".";
+  w.appendChild(n);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ PAINEL DE ALVO ══════════════════════
+   Uma tela só para pré-temporada e treino, porque a decisão é a mesma: em quem.
+   Carta de custo X mostra o preço subindo a cada atleta marcada — é esse número
+   mexendo ao vivo que transforma "cobrir o elenco" numa escolha, e não num rótulo. */
+function podeAlvo(c, a){
+  if(c.t==="PROGRAMA") return !a.progs.includes(c.id) && (!c.soPos || c.soPos===a.pos);
+  if(c.id==="reab" || c.id==="fisio" || c.id==="crio") return a.lesao>0;
+  return true;
+}
+/* ══════════════════════ PRÉVIA DO EFEITO ══════════════════════
+   Responde, carta na mão, a pergunta que o jogo não respondia: "o que acontece se eu
+   jogar ISTO aqui?" — com o número de depois, não só o de agora. */
+const CLASSE_ZONA = {verde:"bom", ambar:"meio", vermelho:"ruim"};
+function clonar(a, progsExtra){
+  return {mods:a.mods, progs:progsExtra || a.progs.slice(), tmp:Object.assign({},a.tmp),
+          lesao:a.lesao, base:a.base, hist:a.hist.slice(), fn:a.fn, pos:a.pos, cro:a.cro, nm:a.nm,
+          fat:a.fat, fatHoje:a.fatHoje, pseVisto:a.pseVisto, pse:a.pse};
+}
+function previsao(c, a){
+  const linhas = [];
+  const seta = (rot, de, para, classe)=>linhas.push({rot, txt:de+" → "+para, classe});
+
+  if(c.t === "PROGRAMA"){
+    if(a.progs.includes(c.id)) return [{rot:"", txt:"ela já tem este programa", classe:"nada"}];
+    if(c.soPos && c.soPos !== a.pos) return [{rot:"", txt:"não serve para esta atleta", classe:"nada"}];
+    const dep = clonar(a, a.progs.concat([c.id]));
+    const at0 = atributo(a), at1 = atributo(dep);
+    if(at1 !== at0) seta(a.pos==="ATQ"?"ataque":"defesa", at0, at1, at1>at0?"bom":"ruim");
+    const p0 = projetar(a), p1 = projetar(dep), alvo = proxJogo();
+    if(p0 !== null && p1 !== null && alvo)
+      seta("no "+alvo, rotuloZona(p0)+" "+p0.toFixed(2), rotuloZona(p1)+" "+p1.toFixed(2),
+           CLASSE_ZONA[zona(p1)]);
+    const r0 = riscoCarga(a), r1 = riscoCarga(dep);
+    if(Math.abs(r1-r0) > .005) seta("risco agora", pct(r0), pct(r1), r1<r0?"bom":"ruim");
+    if(c.ef && (c.ef.sonoOk || c.ef.antifadiga)){
+      const c0 = centroPSE(a, donoDe(a)), c1 = centroPSE(dep, donoDe(a));
+      if(c1 < c0 - .001)
+        seta("PSE dela", c0.toFixed(2)+"×", c1.toFixed(2)+"×", "bom");
+      const amp0 = amplitudePSE(a), amp1 = amplitudePSE(dep);
+      if(amp1 < amp0 - .001)
+        seta("imprevisibilidade", "±"+amp0.toFixed(2), "±"+amp1.toFixed(2), "bom");
+    }
+    if(c.cg) linhas.push({rot:"carga", txt:"+"+c.cg+" por rodada daqui em diante", classe:"meio"});
+    return linhas;
+  }
+  if(c.id === "descarga"){
+    const dep = clonar(a);
+    const corte = reduzAguda(dep, c.ef.reduzAguda);
+    if(corte <= .01) return [{rot:"", txt:"não faz nada: ela já está em 1,00 ou abaixo", classe:"nada"}];
+    seta("razão", razao(a).toFixed(2), razao(dep).toFixed(2), CLASSE_ZONA[zona(razao(dep))]);
+    seta("risco", pct(riscoCarga(a)), pct(riscoCarga(dep)), "bom");
+    linhas.push({rot:"preço", txt:"−"+c.ef.attrPenal+" de atributo até o próximo jogo", classe:"ruim"});
+    return linhas;
+  }
+  if(["crio","fisio","reab","peace"].includes(c.id)){
+    if(!a.lesao) return [{rot:"", txt:"ela não tem lesão para curar", classe:"nada"}];
+    const n = {crio:1, fisio:2, reab:3, peace:1}[c.id];
+    const m = Math.max(0, n - (a.mods.curaMenos||0));
+    seta("lesão", a.lesao+" de 3", Math.max(0,a.lesao-m)+" de 3", "bom");
+    if(m < n) linhas.push({rot:"", txt:"recuperação lenta: cura "+(n-m)+" a menos nela", classe:"meio"});
+    if(c.id==="peace") linhas.push({rot:"e ainda", txt:"−15 p.p. de risco até o próximo jogo", classe:"bom"});
+    return linhas;
+  }
+  if(c.id === "aquecimento"){
+    const dep = clonar(a); dep.tmp.protecao = (dep.tmp.protecao||0) + c.ef.protecaoTmp;
+    seta("risco", pct(riscoCarga(a)), pct(riscoCarga(dep)), "bom");
+    return linhas;
+  }
+  if(c.id === "teste")
+    return [{rot:"", txt: a.revelada ? "a razão dela já está revelada"
+      : "revela a razão exata dela — hoje você só vê a zona", classe: a.revelada?"nada":"bom"}];
+  return [];
+}
+function tiraPrevia(c, a){
+  const l = previsao(c, a);
+  if(!l.length) return null;
+  const w = el("div","prev");
+  w.appendChild(el("span","cab","se aplicar aqui"));
+  for(const x of l){
+    const s = el("span","v "+(x.classe||""));
+    s.textContent = (x.rot ? x.rot+": " : "") + x.txt;
+    w.appendChild(s);
+  }
+  return w;
+}
+
+function painelAlvo(j, o, c, moeda){
+  const sel = S.sel;
+  if(!sel.escolhidas) sel.escolhidas = [];
+  let lista = c.alvo==="atletaAdv" ? o.elenco : j.elenco;
+  if(sel.fixo && c.soPos) lista = lista.filter(a=>a.pos===c.soPos);
+  const saldo  = moeda==="verba" ? j.verba : j.energia;
+  const unidade= moeda==="verba" ? "de verba" : "⚡";
+  const box = el("div","card stack");
+
+  const top = el("div","row"); top.style.justifyContent="space-between"; top.style.alignItems="flex-start";
+  const tt = el("div");
+  tt.appendChild(el("div","lbl", sel.fixo ? "Elenco inteiro — você não escolhe quem"
+    : ehX(c) ? "Escolha X atletas — o custo acompanha" : "Alvo"));
+  tt.appendChild(el("h3","", c.nm));
+  tt.appendChild(el("p","dim", c.tx));
+  top.appendChild(tt);
+  const custoAgora = custoDe(c, sel.escolhidas.length);
+  const pg = el("div"); pg.style.textAlign="right"; pg.style.whiteSpace="nowrap";
+  const nX = el("div","num"); nX.style.fontSize="26px"; nX.style.fontWeight="700";
+  nX.style.color = custoAgora > saldo ? "var(--vermelho)" : "var(--cyan)";
+  nX.textContent = custoAgora + " " + unidade;
+  pg.appendChild(nX);
+  if(ehX(c)) pg.appendChild(el("div","num faint", "X = "+sel.escolhidas.length
+    + (c.custoBase ? "  +  "+c.custoBase+" de base" : "")));
+  pg.appendChild(el("div","lbl", "você tem "+saldo));
+  top.appendChild(pg);
+  box.appendChild(top);
+
+  if(sel.fixo){
+    const av = el("div","aviso");
+    av.textContent = "Esta carta pega TODAS — inclusive quem já está no limite. Olhe a tarja rosa "
+      + "de cada uma antes de confirmar: a mesma carga que acerta uma pode estourar a outra.";
+    box.appendChild(av);
+  } else if(c.t==="PROGRAMA" && ehX(c)){
+    const av = el("div","aviso");
+    av.textContent = "Cada instalação também cobra manutenção todo turno e soma "+c.cg
+      + " de carga por rodada naquela atleta. Alcance custa uma vez; manter custa sempre.";
+    box.appendChild(av);
+  }
+
+  const g = el("div","elenco");
+  for(const a of lista){
+    const pode = podeAlvo(c, a);
+    const marcada = sel.escolhidas.includes(a.id);
+    const cab = ehX(c) && !marcada && custoDe(c, sel.escolhidas.length+1) > saldo;
+    const ca = cartaAtleta(a,{arte:false, sel:marcada,
+      mostraRazao: c.alvo!=="atletaAdv" || a.revelada,
+      clic: sel.fixo ? null : (pode && (!cab || marcada)) ? ()=>{
+        if(!ehX(c)) return aplicarEm(j, o, c, [a], moeda);
+        const k = sel.escolhidas.indexOf(a.id);
+        if(k>=0) sel.escolhidas.splice(k,1); else sel.escolhidas.push(a.id);
+        render();
+      } : null});
+    if(!pode || cab) ca.style.opacity=".38";
+    const pv = tiraPrevia(c, a);
+    if(pv) ca.appendChild(pv);
+    g.appendChild(ca);
+  }
+  box.appendChild(g);
+
+  const r = el("div","row");
+  if(ehX(c) || sel.fixo){
+    const n = sel.escolhidas.length;
+    const b = el("button","pri", (sel.fixo ? "Aplicar nas "+n+" — paga " : "Aplicar em "+n+" — paga ")+custoAgora);
+    b.disabled = !n || custoAgora > saldo;
+    b.onclick = ()=>aplicarEm(j, o, c, sel.escolhidas.map(id=>lista.find(a=>a.id===id)).filter(Boolean), moeda);
+    r.appendChild(b);
+  }
+  const bb = el("button","ghost","Cancelar"); bb.onclick=()=>{ S.sel=null; render(); };
+  r.appendChild(bb);
+  box.appendChild(r);
+  return box;
+}
+
+/* ══════════════════════ TELA · TREINO ══════════════════════ */
+/* ── PSE DA SESSÃO ───────────────────────────────────────────────────────────
+   O botão mais barato do jogo e o que mais muda a decisão. Revela, nesta rodada,
+   quanto cada atleta REALMENTE pagou pelo treino que você prescreveu.
+   Repare no que ele NÃO faz: não corrige nada. Medir custa energia que ia para o
+   treino, e depois de medir você ainda precisa gastar para ajustar. É o ponto da
+   aula 04 — monitorar não previne; monitorar diz quando intervir. */
+function caixaPSE(j){
+  const w = el("div","card stack pseBox");
+  const t = el("div","row");
+  t.appendChild(el("div","lbl","Carga interna · PSE da sessão"));
+  w.appendChild(t);
+  if(j.pseAberta){
+    const med = j.elenco.map(a=>({a, f:fatorHoje(a)})).sort((x,y)=>y.f-x.f);
+    const alta = med.filter(m=>m.f >= 1.12);
+    w.appendChild(el("p","", alta.length
+      ? "Medido. Quem pagou mais caro pelo mesmo treino: "
+        + alta.map(m=>m.a.nm+" ("+m.f.toFixed(2)+"×)").join(" · ") + "."
+      : "Medido. Ninguém pagou muito acima do prescrito nesta rodada."));
+    w.appendChild(el("p","faint","A carga que entra na razão aguda:crônica é a da direita, "
+      + "não a que você prescreveu. A projeção de cada atleta passou a usar o fator medido."));
+  } else {
+    w.appendChild(el("p","","O número de carga na carta é o que você "
+      + "PRESCREVEU. O que cada atleta paga por ele é diferente, e muda com sono, "
+      + "viagem e lesão recente. Enquanto não medir, a projeção supõe que todas pagam 1,00× "
+      + "— e algumas não pagam."));
+    const b = el("button","pri","Colher a PSE da sessão · "+PSE_CUSTO+" ⚡");
+    b.disabled = j.energia < PSE_CUSTO;
+    b.onclick = ()=>{
+      j.energia -= PSE_CUSTO; j.pseAberta = true;
+      for(const a of j.elenco) a.pseVisto = fatorHoje(a);
+      log(j.nome+" colheu a PSE da sessão.", j.i);
+      render();
+    };
+    w.appendChild(b);
+    if(j.energia < PSE_CUSTO) w.appendChild(el("p","faint","Sem energia para medir nesta rodada."));
+  }
+  return w;
+}
+
+function telaTreino(app){
+  const j = S.j[S.atual];
+  const o = adv(S.atual);
+  const w = el("div","stack");
+  const r = rodadaAtual();
+  w.appendChild(el("h2","","Treino · "+r.r+" · "+j.nome));
+
+  const av0 = caixaAvisos(); if(av0) w.appendChild(av0);
+  const st = el("div","saldo");
+  const b1 = el("div","b");
+  b1.appendChild(el("div","v"+(j.energia?"":" zero"), String(j.energia)));
+  b1.appendChild(el("div","lbl","energia nesta rodada"));
+  st.appendChild(b1);
+  const b2 = el("div","b");
+  b2.appendChild(el("div","s", (j.manut||0)+" ⚡")); b2.appendChild(el("div","lbl","já paga de manutenção"));
+  st.appendChild(b2);
+  const b3 = el("div","b");
+  b3.appendChild(el("div","s", j.mao.length+"/"+LIMITE_MAO)); b3.appendChild(el("div","lbl","cartas na mão"));
+  st.appendChild(b3);
+  st.appendChild(el("div","obs","Energia NÃO acumula: o que sobrar nesta rodada se perde. "
+    + "Toda atleta recebe "+CARGA_COLETIVA+" de carga do treino coletivo mesmo sem carta nenhuma."));
+  w.appendChild(st);
+  w.appendChild(caixaPSE(j));
+
+  if(j.mao.length > LIMITE_MAO){
+    const a = el("div","aviso");
+    a.textContent = "Mão acima do limite. Descarte "+(j.mao.length-LIMITE_MAO)+" carta(s) para encerrar a rodada.";
+    w.appendChild(a);
+  }
+
+  /* carta selecionada: escolher alvo */
+  if(S.sel && S.sel.tipo==="mao"){
+    w.appendChild(painelAlvo(j, o, ACAO[S.sel.id], "energia"));
+    app.appendChild(w); return;
+  }
+
+  /* mão */
+  const sm = el("div","stack");
+  sm.appendChild(el("div","lbl","Sua mão"));
+  if(!j.mao.length) sm.appendChild(el("p","faint","Mão vazia."));
+  const gm = el("div","mao");
+  j.mao.forEach((id,k)=>{
+    const c = ACAO[id];
+    const podeAgora = (c.quando==="treino" || c.quando==="sempre");
+    const no = !podeAgora || custoMinimo(c) > j.energia;
+    const cc = cartaAcao(id,{no, clic: no?null:()=>{
+      if(c.alvo==="nenhum") return aplicarEm(j,o,c,[], "energia");
+      if(c.alvo==="todas" && c.t!=="PROGRAMA") return aplicarEm(j,o,c,alvosAuto(j,c), "energia");
+      S.sel = {tipo:"mao", id, k, fixo:c.alvo==="todas",
+               escolhidas:c.alvo==="todas" ? alvosAuto(j,c).map(a=>a.id) : []};
+      render();
+    }});
+    const d = el("button","ghost","descartar");
+    d.style.fontSize="11px"; d.style.padding="3px 8px"; d.style.marginTop="4px";
+    d.onclick = (e)=>{ e.stopPropagation(); j.mao.splice(k,1); log(j.nome+" descartou "+c.nm+".", j.i); render(); };
+    const wrap = el("div","stack"); wrap.style.gap="0";
+    wrap.appendChild(cc); wrap.appendChild(d);
+    gm.appendChild(wrap);
+  });
+  sm.appendChild(gm);
+  w.appendChild(sm);
+
+  /* elenco próprio */
+  const se = el("div","stack");
+  se.appendChild(el("div","lbl","Seu elenco · carga por rodada e zona"));
+  const ge = el("div","elenco");
+  for(const a of j.elenco) ge.appendChild(cartaAtleta(a,{mostraRazao:true}));
+  se.appendChild(ge);
+  w.appendChild(se);
+
+  /* elenco adversário: zona pública, razão só se revelada */
+  const sa = el("div","stack");
+  sa.appendChild(el("div","lbl","Elenco de "+o.nome+" · zona é pública, a casa decimal se compra"));
+  const ga = el("div","elenco");
+  for(const a of o.elenco) ga.appendChild(cartaAtleta(a,{arte:false, mostraRazao:o.scout||a.revelada}));
+  sa.appendChild(ga);
+  w.appendChild(sa);
+
+  const rr = el("div","row");
+  const b = el("button","pri", S.atual===S.primeiro ? "Terminar — passar para "+adv(S.atual).nome : "Terminar a rodada "+r.r);
+  b.disabled = j.mao.length > LIMITE_MAO;
+  b.onclick = ()=>{
+    if(S.atual===S.primeiro){
+      S.atual = 1-S.atual; S.sel=null;
+      render();
+    } else { avancarRodada(); }
+  };
+  rr.appendChild(b);
+  w.appendChild(rr);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ APLICAR CARTA (fora do duelo) ══════════════════════ */
+function curar(a, n){
+  const m = Math.max(0, n - (a.mods.curaMenos || 0));
+  a.lesao = Math.max(0, a.lesao - m);
+  return m;
+}
+function aplicarEm(j, o, c, alvos, moeda){
+  alvos = alvos || [];
+  const custo = custoDe(c, alvos.length);
+  if(moeda==="verba"){ if(custo > j.verba) return; j.verba -= custo; }
+  else {
+    if(custo > j.energia) return;
+    j.energia -= custo;
+    const i = j.mao.indexOf(c.id);
+    if(i>=0) j.mao.splice(i,1);
+  }
+  const a = alvos[0];
+  const nomes = alvos.map(x=>x.nm).join(", ");
+  let msg = j.nome+" jogou "+c.nm;
+
+  if(c.t==="PROGRAMA"){
+    for(const x of alvos){ x.progs.push(c.id); j.ordem.push({aid:x.id, pid:c.id}); }
+    msg += " em "+alvos.length+" atleta(s) — "+nomes+" (carga +"+c.cg+"/rodada em cada)";
+    j.manut = manutencao(j);
+  } else if(c.id==="aquecimento"){
+    for(const x of alvos) x.tmp.protecao = (x.tmp.protecao||0) + c.ef.protecaoTmp;
+    msg += " em "+nomes+": −"+Math.round(c.ef.protecaoTmp*100)+" p.p. de risco em cada até o próximo jogo";
+  } else if(c.id==="coletivo"){
+    j.cargaExtra = (j.cargaExtra||0) + 3;
+    msg += ": +3 de carga em TODO o seu elenco nesta rodada — inclusive em quem não aguenta";
+  } else if(c.id==="crio"){
+    const tot = alvos.reduce((s,x)=>s+curar(x,1), 0);
+    msg += " em "+nomes+" (curou "+tot+" no total)";
+  } else if(c.id==="descarga"){
+    const corte = reduzAguda(a, c.ef.reduzAguda);
+    if(corte > 0.01){
+      a.tmp.attrPenal = (a.tmp.attrPenal || 0) + c.ef.attrPenal;
+      msg += " em "+a.nm+": carga aguda caiu "+corte.toFixed(1)+", razão agora "+razao(a).toFixed(2)
+          +" — e ela chega ao jogo "+c.ef.attrPenal+" menos afiada";
+    } else {
+      msg += " em "+a.nm+" — e não fez nada: ela já estava em 1,00 ou abaixo. "
+          +"Recuperação não substitui treino, e não cobrou atributo porque não houve descarga";
+    }
+  } else if(c.id==="fisio"){ const m=curar(a,2); msg += " em "+a.nm+" (curou "+m+")";
+  } else if(c.id==="reab"){ const m=curar(a,3); msg += " em "+a.nm+" (curou "+m+")";
+  } else if(c.id==="peace"){ const m=curar(a,1); a.tmp.protecao=(a.tmp.protecao||0)+.15;
+    msg += " em "+a.nm+" (curou "+m+", −15 p.p. até o próximo jogo)";
+  } else if(c.id==="teste"){ a.revelada=true; msg += " em "+a.nm+": razão "+razao(a).toFixed(2);
+  } else if(c.id==="scout"){ o.scout=true; msg += ": razões de todo o elenco de "+o.nome+" reveladas";
+  } else if(c.id==="calend"){ o.limiteEnergia=2; msg += ": "+o.nome+" terá só 2 de energia na próxima rodada";
+  } else if(c.id==="viagem"){ o.cargaExtra=(o.cargaExtra||0)+2; o.estressePSE=(o.estressePSE||0)+.12;
+    msg += ": +2 de carga em todo o elenco de "+o.nome+" nesta rodada, e a PSE delas sobe na próxima";
+  } else if(c.id==="diretoria"){ j.energia += 3; j.pendEnergia = (j.pendEnergia||0) - 2;
+    msg += ": +3 agora, −2 na próxima";
+  }
+  log(msg+".", j.i);
+  S.sel = null;
+  render();
+}
+/* compatibilidade com as chamadas de alvo único */
+const aplicar = (j,o,c,a)=>aplicarEm(j,o,c,a?[a]:[], "energia");
+
+/* ══════════════════════ FIM DE RODADA ══════════════════════ */
+function avancarRodada(){
+  const r = rodadaAtual();
+  S.avisos = [];   /* guarda só o que aconteceu na rodada que está fechando agora */
+  for(const j of S.j){
+    const extra = j.cargaExtra || 0;
+    for(const a of j.elenco){
+      /* o que você prescreveu × o que ela pagou. Só o segundo entra na razão. */
+      const presc = cargaRodada(a) + extra;
+      const real  = presc * fatorHoje(a);
+      a.pse.push({r:r.r, presc, fat:fatorHoje(a), real, medida:!!j.pseAberta});
+      if(j.pseAberta) a.pseVisto = fatorHoje(a);
+      a.hist.push(real);
+      /* recuperação contínua: puxa na direção de 1,00 e para ali */
+      let fr = 0;
+      for(const p of a.progs) fr = Math.max(fr, ACAO[p].ef.reduzRodada || 0);
+      if(fr > 0) reduzAguda(a, fr);
+      if(temEf(a,"curaLenta")){
+        a.tmp.sono = (a.tmp.sono||0) + 1;
+        if(a.tmp.sono >= 2){ a.tmp.sono = 0; if(a.lesao>0) curar(a,1); }
+      }
+      a.serie.push({r:r.r, aguda:aguda(a), cronica:cronica(a), razao:razao(a)});
+      /* a conta do excesso é cobrada aqui, no treino, e não só no dia de jogo */
+      if(disponivel(a)){
+        const p = riscoTreino(a);
+        if(Math.random() < p){
+          ferir(a, 1, "sobrecarga no treino", p);
+          S.avisos.push({j:j.i, nm:a.nm, razao:razao(a), p,
+            zona:rotuloZona(razao(a)), lesao:a.lesao});
+        }
+      }
+    }
+  }
+  for(const j of S.j) j.cargaExtra = 0;
+  S.rodada++;
+  S.sel = null;
+  if(S.rodada >= SEQ.length){ S.fase="relatorio"; render(); return; }
+  if(rodadaAtual().k === "J"){
+    sortearFatores();           /* o dia de jogo também tem fator, e ninguém o mede antes */
+    S.fase = "escalacao"; S.atual = 0;
+    for(const j of S.j){ j.quadra = {}; j.energia = Math.max(j.energia, 2); }
+    S.slotSel = null;
+    passar(S.j[0].nome, "Dia de jogo. Escale 3 atacantes e 3 defensoras em segredo. "
+      + adv(0).nome + " não deve ver esta tela.", ()=>render());
+    return;
+  }
+  iniciaRodada();
+  render();
+}
+
+/* ══════════════════════ QUADRA E IMPROVISO ══════════════════════
+   Seis posições, cada uma pedindo uma função. Escalar fora da função custa atributo e
+   risco: a atleta executa um gesto para o qual o tecido dela não está condicionado,
+   que é capacidade × demanda no nível do gesto — o conteúdo da aula 13.
+   A rede ataca o fundo adversário na DIAGONAL, como um ataque cruzado de verdade. */
+const QUADRA = [
+ {id:"r4", lin:"rede",  nm:"Rede esquerda",  pede:"Ponteira", contra:"f1"},
+ {id:"r3", lin:"rede",  nm:"Rede meio",      pede:"Central",  contra:"f6"},
+ {id:"r2", lin:"rede",  nm:"Rede direita",   pede:"Oposta",   contra:"f5"},
+ {id:"f5", lin:"fundo", nm:"Fundo esquerda", pede:"Líbero"},
+ {id:"f6", lin:"fundo", nm:"Fundo meio",     pede:"Líbero"},
+ {id:"f1", lin:"fundo", nm:"Fundo direita",  pede:"Central"},
+];
+const SLOT = Object.fromEntries(QUADRA.map(s=>[s.id,s]));
+function familia(fn){
+  if(/Oposta/.test(fn))   return "Oposta";
+  if(/Ponteira/.test(fn)) return "Ponteira";
+  if(/Central/.test(fn))  return "Central";
+  return "Líbero";
+}
+function improviso(slotId, a){
+  if(!a) return {attr:0, risco:0, rot:null, grave:false};
+  const s = SLOT[slotId], f = familia(a.fn);
+  if(f === s.pede) return {attr:0, risco:0, rot:null, grave:false};
+  /* líbero na rede é o caso extremo: no vôlei de verdade ela nem pode atacar de cima */
+  if(s.lin === "rede" && f === "Líbero")
+    return {attr:4, risco:.15, rot:"líbero na rede · −4 e +15 p.p.", grave:true};
+  return {attr:2, risco:.08, rot:"improviso · −2 e +8 p.p.", grave:false};
+}
+const naQuadra = (j)=>QUADRA.map(s=>j.quadra[s.id]).filter(Boolean);
+const atletaEm = (j, slotId)=>j.elenco.find(a=>a.id === j.quadra[slotId]) || null;
+
+function mapaQuadra(j, opts){
+  opts = opts || {};
+  const w = el("div","qd");
+  const faz = (linha)=>{
+    const g = el("div","linha");
+    for(const s of QUADRA.filter(x=>x.lin===linha)){
+      const a = atletaEm(j, s.id);
+      const imp = improviso(s.id, a);
+      const b = el(opts.clic ? "button" : "div", "sl" + (a ? " cheio" : "")
+        + (opts.slotSel===s.id ? " alvo" : ""));
+      b.appendChild(el("div","pede", s.nm + " · pede " + s.pede));
+      if(a){
+        const top = el("div","row"); top.style.justifyContent="space-between"; top.style.gap="5px";
+        top.appendChild(el("div","quem", a.nm));
+        top.appendChild(el("div","n", String(Math.max(0, atributo(a) - imp.attr))));
+        b.appendChild(top);
+        const r = razao(a);
+        b.appendChild(el("span","zq z-"+zona(r), rotuloZona(r)));
+        if(imp.rot) b.appendChild(el("div","imp"+(imp.grave?" grave":""), imp.rot));
+        else b.appendChild(el("div","imp","na função"));
+      } else {
+        b.appendChild(el("div","vaz","vazia — toque para escalar"));
+      }
+      if(opts.clic) b.onclick = ()=>opts.clic(s.id);
+      g.appendChild(b);
+    }
+    return g;
+  };
+  w.appendChild(faz("rede"));
+  w.appendChild(el("div","net"));
+  w.appendChild(faz("fundo"));
+  return w;
+}
+
+/* ══════════════════════ TELA · ESCALAÇÃO (a única coisa secreta) ══════════════════════ */
+function telaEscalacao(app){
+  const j = S.j[S.atual];
+  if(!j.quadra) j.quadra = {};
+  const w = el("div","stack");
+  w.appendChild(el("h2","","Escalação secreta · "+j.nome+" · "+rodadaAtual().r));
+
+  w.appendChild(mapaQuadra(j, {slotSel:S.slotSel, clic:(sid)=>{
+    if(j.quadra[sid]){ delete j.quadra[sid]; S.slotSel = null; }
+    else S.slotSel = (S.slotSel === sid ? null : sid);
+    render();
+  }}));
+
+  if(S.slotSel){
+    const s = SLOT[S.slotSel];
+    const box = el("div","card stack");
+    box.appendChild(el("div","lbl", s.nm + " — pede " + s.pede));
+    box.appendChild(el("h3","","Quem joga aqui?"));
+    const usadas = naQuadra(j);
+    const g = el("div","elenco");
+    const ordem = j.elenco.slice().sort((a,b)=>{
+      const fa = familia(a.fn)===s.pede ? 0 : 1, fb = familia(b.fn)===s.pede ? 0 : 1;
+      return fa - fb || atributo(b) - atributo(a);
+    });
+    for(const a of ordem){
+      const ja = usadas.includes(a.id);
+      const pode = disponivel(a) && !ja;
+      const imp = improviso(S.slotSel, a);
+      const ca = cartaAtleta(a,{arte:false, mostraRazao:true,
+        clic: pode ? ()=>{ j.quadra[S.slotSel] = a.id; S.slotSel = null; render(); } : null});
+      if(!pode) ca.style.opacity=".35";
+      const tag = el("div","lbl");
+      if(!disponivel(a)){ tag.textContent="fora — 3 de lesão"; tag.style.color="var(--vermelho)"; }
+      else if(ja){ tag.textContent="já escalada"; }
+      else if(imp.rot){ tag.textContent=imp.rot; tag.style.color= imp.grave ? "var(--vermelho)" : "var(--ambar)"; }
+      else { tag.textContent="na função — sem penalidade"; tag.style.color="var(--verde)"; }
+      tag.style.marginTop="6px"; ca.appendChild(tag);
+      g.appendChild(ca);
+    }
+    box.appendChild(g);
+    const bb = el("button","ghost","Cancelar"); bb.onclick=()=>{ S.slotSel=null; render(); };
+    box.appendChild(bb);
+    w.appendChild(box);
+    app.appendChild(w); return;
+  }
+
+  const imps = QUADRA.map(s=>improviso(s.id, atletaEm(j, s.id))).filter(i=>i.rot);
+  if(imps.length){
+    const av = el("div","aviso");
+    av.textContent = imps.length + " atleta(s) escalada(s) fora de função. Improviso é uma decisão "
+      + "legítima — às vezes é melhor que escalar uma titular sobrecarregada — mas custa atributo "
+      + "e aumenta o risco de lesão no duelo.";
+    w.appendChild(av);
+  }
+
+  const r = el("div","row");
+  const pronto = naQuadra(j).length === 6;
+  const b = el("button","pri", S.atual===0 ? "Confirmar e passar o aparelho" : "Revelar as duas quadras");
+  b.disabled = !pronto;
+  b.onclick = ()=>{
+    S.slotSel = null;
+    if(S.atual===0){
+      S.atual = 1;
+      passar(S.j[1].nome, "A quadra de "+S.j[0].nome+" está travada e escondida. Agora é a sua.", ()=>render());
+    } else { montarDuelos(); S.fase="duelos"; S.di=0; render(); }
+  };
+  r.appendChild(b);
+  if(!pronto) r.appendChild(el("span","faint", (6-naQuadra(j).length)+" posição(ões) vazia(s)."));
+  w.appendChild(r);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ DUELOS ══════════════════════ */
+function montarDuelos(){
+  S.duelos = [];
+  for(const s of QUADRA.filter(x=>x.lin==="rede")){
+    for(const ia of [0,1]){
+      const idf = 1-ia;
+      const atq = atletaEm(S.j[ia], s.id), def = atletaEm(S.j[idf], s.contra);
+      if(!atq || !def) continue;
+      S.duelos.push({ia, idf, atq, def, slotA:s.id, slotD:s.contra,
+                     impA:improviso(s.id, atq), impD:improviso(s.contra, def),
+                     mod:{dem:0,cap:0,evita:0,bonus:0,falta:null}, usadas:[], feito:false, res:null});
+    }
+  }
+}
+function demanda(d){ return Math.max(0, atributo(d.atq) + (d.atq.mods.demanda||0) - d.impA.attr + d.mod.dem); }
+function capacidade(d){ return Math.max(0, atributo(d.def) - d.impD.attr + d.mod.cap); }
+
+function podeNoDuelo(c, pi, d){
+  if(c.quando!=="jogo" && c.quando!=="sempre") return false;
+  if(c.id==="invasao" || c.id==="troca" || c.id==="crio") return true;
+  if(c.alvo==="duelo")    return (c.id==="banda"||c.id==="imediato") ? pi===d.idf : pi===d.ia;
+  if(c.alvo==="dueloAdv") return pi===d.idf;
+  return false;
+}
+function intervir(pi, id, alvoAtl){
+  const j = S.j[pi], d = S.duelos[S.di], c = ACAO[id];
+  if(c.custo > j.energia) return;
+  j.energia -= c.custo;
+  const i = j.mao.indexOf(id); if(i>=0) j.mao.splice(i,1);
+  let msg = j.nome+" jogou "+c.nm;
+  if(c.id==="banda"){ d.mod.cap += 2; msg += ": +2 de capacidade para "+d.def.nm; }
+  else if(c.id==="imediato"){ d.mod.evita += 1; msg += ": 1 ponto de lesão evitado neste duelo"; }
+  else if(c.id==="tempo"){ d.mod.dem -= 2; msg += ": −2 na demanda de "+d.atq.nm; }
+  else if(c.id==="acelerado"){ d.mod.dem += 3; msg += ": +3 na demanda de "+d.atq.nm; }
+  else if(c.id==="saque"){ d.mod.dem += 2; d.mod.bonus += 1; msg += ": +2 de demanda e +1 ponto se vencer"; }
+  else if(c.id==="crio"){ const m=curar(alvoAtl,1); msg += " em "+alvoAtl.nm+" (curou "+m+")"; }
+  else if(c.id==="troca"){ const m=curar(alvoAtl,1); msg += ": "+alvoAtl.nm+" sai com 1 ponto de lesão a menos ("+m+")"; }
+  else if(c.id==="invasao"){
+    /* Trauma agudo: o entorse acontece pela aterrissagem, não pela planilha. Por isso
+       o piso é 1 e não depende de carga nenhuma — é o contínuo agudo × overuse da
+       aula 01. O que a carga e a preparação decidem é a GRAVIDADE, não o evento. */
+    const r = razao(alvoAtl);
+    const prot = alvoAtl.progs.includes("propri") || alvoAtl.progs.includes("banda")
+              || (alvoAtl.tmp && alvoAtl.tmp.banda);
+    let n = 1, pq = ["trauma da aterrissagem"];
+    if(r > 1.45){ n += 1; pq.push("em sobrecarga, razão "+r.toFixed(2)+" — fadiga piora o controle da aterrissagem"); }
+    if(prot){ n -= 1; pq.push("protegida por propriocepção ou bandagem"); }
+    n = Math.max(1, n);
+    ferir(alvoAtl, n, "entorse de tornozelo · "+pq.join(" · "), null);
+    d.mod.falta = pi;      /* invadir é falta: o ponto do duelo é da adversária */
+    msg += " em "+alvoAtl.nm+": entorse de tornozelo, "+n+" de lesão"
+        + (prot ? " (a propriocepção segurou um ponto)" : "")
+        + ". É falta — o ponto do duelo vai para " + S.j[1-pi].nome;
+    alvoAtl.revelada = true;
+  }
+  log(msg+".", pi);
+  S.sel = null;
+  render();
+}
+function ferir(a, n, motivo, prob){
+  let q = n;
+  if(a.mods.absorve && !a.usouAbsorve){ a.usouAbsorve = true; q = Math.max(0, q-1);
+    if(q<n) log(a.nm+" absorveu 1 ponto de lesão (constância).", null); }
+  if(q<=0) return 0;
+  a.lesao = Math.min(3, a.lesao + q);
+  a.eventos.push({r:SEQ[S.rodada].r, motivo, prob});
+  log(a.nm+": "+q+" de lesão — "+motivo+(prob!=null?" ("+pct(prob)+" aceito)":"")+".", null);
+  return q;
+}
+
+function telaDuelos(app){
+  const w = el("div","stack");
+  const d = S.duelos[S.di];
+  w.appendChild(el("h2","","Duelo "+(S.di+1)+" de 6 · "+rodadaAtual().r));
+
+  const dem = demanda(d), cap = capacidade(d);
+  const pp = pPonto(dem, cap);
+  const pld = pLesaoDef(d.def, dem, cap, d.impD.risco);
+  const pla = pLesaoAtq(d.atq, d.impA.risco);
+
+  const du = el("div","duelo card");
+  const lado = (ji, a, imp, slotId, valor, rot)=>{
+    const e = el("div","lado");
+    e.appendChild(el("div","lbl", S.j[ji].nome+" · "+SLOT[slotId].nm));
+    e.appendChild(el("div","nm disp", a.nm));
+    e.appendChild(el("div","n", String(valor)));
+    e.appendChild(el("div","lbl", rot));
+    const z = razao(a);
+    e.appendChild(el("span","zona z-"+zona(z), rotuloZona(z)));
+    if(imp.rot){
+      const w2 = el("div","lbl", imp.rot);
+      w2.style.color = imp.grave ? "var(--vermelho)" : "var(--ambar)";
+      w2.style.marginTop = "5px";
+      e.appendChild(w2);
+    }
+    return e;
+  };
+  du.appendChild(lado(d.ia, d.atq, d.impA, d.slotA, dem, "demanda"));
+  du.appendChild(el("div","vs","ataca na diagonal"));
+  du.appendChild(lado(d.idf, d.def, d.impD, d.slotD, cap, "capacidade"));
+  w.appendChild(du);
+
+  const pb = el("div","card prob");
+  pb.appendChild(el("div","lbl","A chance está à vista antes de confirmar"));
+  pb.appendChild(linhaProb("ponto para "+S.j[d.ia].nome, pp, "var(--atq)"));
+  pb.appendChild(linhaProb("lesão em "+d.def.nm+" (defesa)", pld, "var(--vermelho)"));
+  pb.appendChild(linhaProb("lesão em "+d.atq.nm+" (ataque)", pla, "var(--vermelho)"));
+  const n = el("p","faint");
+  n.textContent = "Risco é probabilidade, não destino. Razão 1,8 não garante lesão, e ninguém se "
+    + "machucar não significa que a dose estava certa.";
+  pb.appendChild(n);
+  w.appendChild(pb);
+
+  /* instants dos dois lados — informação aberta, os dois respondem */
+  for(const pi of [d.ia, d.idf]){
+    const j = S.j[pi];
+    const disp = j.mao.filter(id=>podeNoDuelo(ACAO[id], pi, d));
+    if(!disp.length) continue;
+    const sec = el("div","stack");
+    sec.appendChild(el("div","lbl", j.nome+" pode intervir · energia "+j.energia));
+    const g = el("div","mao");
+    for(const id of disp){
+      const c = ACAO[id];
+      const no = c.custo > j.energia;
+      g.appendChild(cartaAcao(id,{no, clic: no?null:()=>{
+        if(c.id==="invasao"){ S.sel={tipo:"duelo", pi, id, alvos:"adv"}; render(); }
+        else if(c.id==="troca"||c.id==="crio"){ S.sel={tipo:"duelo", pi, id, alvos:"meu"}; render(); }
+        else intervir(pi, id, null);
+      }}));
+    }
+    sec.appendChild(g);
+    w.appendChild(sec);
+  }
+
+  if(S.sel && S.sel.tipo==="duelo"){
+    const pi = S.sel.pi, c = ACAO[S.sel.id];
+    const lista = S.sel.alvos==="adv" ? S.j[1-pi].elenco : S.j[pi].elenco;
+    const box = el("div","card stack");
+    box.appendChild(el("div","lbl","Alvo de "+c.nm));
+    const g = el("div","elenco");
+    for(const a of lista){
+      g.appendChild(cartaAtleta(a,{arte:false, mostraRazao: S.sel.alvos==="meu" || a.revelada,
+        clic: ()=>intervir(pi, S.sel.id, a)}));
+    }
+    box.appendChild(g);
+    const bb=el("button","ghost","Cancelar"); bb.onclick=()=>{ S.sel=null; render(); };
+    box.appendChild(bb);
+    w.appendChild(box);
+  }
+
+  const r = el("div","row");
+  const b = el("button","pri","Resolver o duelo");
+  b.onclick = resolver;
+  r.appendChild(b);
+  w.appendChild(r);
+
+  if(S.log.length){
+    const lb = el("div","card logbox");
+    S.log.slice(0,8).forEach(l=>{ const d2=el("div"); d2.appendChild(el("span","lbl",l.r+" ")); d2.appendChild(document.createTextNode(l.txt)); lb.appendChild(d2); });
+    w.appendChild(lb);
+  }
+  app.appendChild(w);
+}
+
+function resolver(){
+  const d = S.duelos[S.di];
+  const dem = demanda(d), cap = capacidade(d);
+  const pp = pPonto(dem,cap), pld = pLesaoDef(d.def,dem,cap,d.impD.risco), pla = pLesaoAtq(d.atq,d.impA.risco);
+  const g = S.jogo;
+
+  if(d.atq.expulsa || d.def.expulsa){
+    log("Atleta expulsa: o duelo "+(S.di+1)+" não é disputado.", null);
+  } else if(d.mod.falta != null){
+    const vit = 1 - d.mod.falta;
+    S.j[vit].pontos[g] += 1;
+    log("Invasão na linha central — falta. Ponto para "+S.j[vit].nome+".", vit);
+  } else if(Math.random() < pp){
+    let pts = 1 + d.mod.bonus + (d.atq.mods.bonusPonto||0);
+    S.j[d.ia].pontos[g] += pts;
+    log(d.atq.nm+" marcou "+pts+" para "+S.j[d.ia].nome+" ("+pct(pp)+").", d.ia);
+  } else {
+    S.j[d.idf].pontos[g] += 1;
+    log(d.def.nm+" defendeu — ponto para "+S.j[d.idf].nome+".", d.idf);
+  }
+
+  if(!d.atq.expulsa && !d.def.expulsa){
+    if(Math.random() < pld){
+      const q = Math.max(0, 1 - d.mod.evita);
+      if(q>0) ferir(d.def, 1, "demanda acima da capacidade no duelo", pld);
+      else log("Atendimento imediato evitou a lesão de "+d.def.nm+".", d.idf);
+    }
+    if(Math.random() < pla) ferir(d.atq, 1, "carga mal administrada no dia de jogo", pla);
+  }
+
+  d.feito = true;
+  S.di++;
+  S.sel = null;
+  if(S.di >= S.duelos.length) fecharJogo(); else render();
+}
+
+function fecharJogo(){
+  const g = S.jogo, r = rodadaAtual();
+  const p0 = S.j[0].pontos[g], p1 = S.j[1].pontos[g];
+  let v = null;
+  if(p0 > p1) v = 0; else if(p1 > p0) v = 1;
+  if(v !== null){
+    S.j[v].vitorias++;
+    S.j[v].perdeu = false;
+    S.j[1-v].perdeu = true;
+    S.primeiro = 1 - v;   /* freio de acesso: quem perdeu escolhe primeiro no mercado */
+    log(S.j[v].nome+" venceu "+r.r+" por "+Math.max(p0,p1)+" a "+Math.min(p0,p1)+".", v);
+  } else {
+    log(r.r+" empatado em "+p0+".", null);
+  }
+  for(const j of S.j){
+    const emQuadra = naQuadra(j);
+    for(const a of j.elenco){
+      const jogou = emQuadra.includes(a.id);
+      const presc = cargaRodada(a) + (jogou ? CARGA_JOGO : 0);
+      const real  = presc * fatorHoje(a);
+      a.pse.push({r:r.r, presc, fat:fatorHoje(a), real, medida:false});
+      a.hist.push(real);
+      a.tmp.protecao = 0;
+      a.tmp.attrPenal = 0;
+      a.expulsa = false;
+      a.serie.push({r:r.r, aguda:aguda(a), cronica:cronica(a), razao:razao(a)});
+    }
+  }
+  S.jogo++;
+  S.rodada++;
+  S.fase = "resultado";
+  render();
+}
+
+/* ══════════════════════ TELA · RESULTADO DO JOGO ══════════════════════ */
+function telaResultado(app){
+  const g = S.jogo - 1;
+  const w = el("div","stack");
+  w.appendChild(el("h2","","Fim do "+(g===0?"JOGO 1":"JOGO 2")));
+  const pl = el("div","card grid3");
+  for(const j of S.j){
+    const b = el("div"); b.style.textAlign="center";
+    b.appendChild(el("div","lbl", j.nome));
+    const n = el("div","n num", String(j.pontos[g])); n.style.fontSize="44px"; b.appendChild(n);
+    b.appendChild(el("div","faint", j.vitorias+" vitória(s) na partida"));
+    pl.appendChild(b);
+  }
+  w.appendChild(pl);
+
+  const les = [];
+  for(const j of S.j) for(const a of j.elenco)
+    if(a.eventos.some(e=>e.r===SEQ[g===0?3:7].r)) les.push([j,a]);
+  if(les.length){
+    const c = el("div","card stack");
+    c.appendChild(el("h3","","Lesões neste jogo"));
+    for(const [j,a] of les){
+      const d = el("div");
+      const ev = a.eventos.filter(e=>e.r===SEQ[g===0?3:7].r);
+      d.appendChild(el("span","lbl", j.nome+" · "));
+      d.appendChild(document.createTextNode(a.nm+" — "+ev.map(e=>e.motivo).join("; ")
+        +" · razão "+razao(a).toFixed(2)+" · "+a.lesao+" de 3"));
+      c.appendChild(d);
+    }
+    w.appendChild(c);
+  } else {
+    const c = el("div","ok");
+    c.textContent = "Nenhuma lesão neste jogo. Isso não prova que a dose estava certa — só que a "
+      + "probabilidade não se realizou. Olhem as zonas, não o desfecho.";
+    w.appendChild(c);
+  }
+
+  if(S.j[0].perdeu || S.j[1].perdeu){
+    const p = S.j[0].perdeu ? S.j[0] : S.j[1];
+    const c = el("div","aviso");
+    c.textContent = p.nome+" perdeu, então recebe "+ENERGIA_PERDEDOR+" de energia por rodada e escolhe "
+      + "primeiro no mercado. Mais acesso, não mais volume — volume demais empurraria para o erro "
+      + "que o jogo pune.";
+    w.appendChild(c);
+  }
+
+  const r = el("div","row");
+  const fim = S.rodada >= SEQ.length;
+  const b = el("button","pri", fim ? "Ver o relatório da partida" : "Seguir para "+SEQ[S.rodada].r);
+  b.onclick = ()=>{
+    if(fim){ S.fase="relatorio"; render(); }
+    else { iniciaRodada(); render(); }
+  };
+  r.appendChild(b);
+  w.appendChild(r);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ CURVA DE CARGA ══════════════════════ */
+function curvaSVG(a){
+  const W=300,H=96,pad=22;
+  const s = a.serie;
+  if(!s.length) return el("div");
+  const maxV = Math.max(4, ...s.map(x=>Math.max(x.aguda,x.cronica)));
+  const X = (i)=>pad + (s.length<2?0:i*(W-pad-10)/(s.length-1));
+  const Y = (v)=>H-18 - (v/maxV)*(H-34);
+  const mk=(t,at)=>{const n=document.createElementNS(NS,t); for(const k in at) n.setAttribute(k,at[k]); return n;};
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.setAttribute("width","100%");
+  svg.setAttribute("role","img");
+  svg.setAttribute("aria-label","curva de carga de "+a.nm);
+  svg.appendChild(mk("line",{x1:pad,y1:H-18,x2:W-10,y2:H-18,stroke:"#24323F","stroke-width":1}));
+  const linha=(key,cor,tracejado)=>{
+    const d = s.map((x,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(x[key]).toFixed(1)).join(" ");
+    const p = mk("path",{d, fill:"none", stroke:cor, "stroke-width":2});
+    if(tracejado) p.setAttribute("stroke-dasharray","4 3");
+    svg.appendChild(p);
+  };
+  linha("cronica","#4A9BE0",true);
+  linha("aguda","#F0803C",false);
+  for(const ev of a.eventos){
+    const i = s.findIndex(x=>x.r===ev.r);
+    if(i<0) continue;
+    svg.appendChild(mk("circle",{cx:X(i),cy:Y(s[i].aguda),r:4.5,fill:"#E05252",stroke:"#0A1018","stroke-width":1.5}));
+  }
+  s.forEach((x,i)=>{
+    const t=mk("text",{x:X(i),y:H-6,fill:"#5C7083","font-size":8,"text-anchor":"middle","font-family":"JetBrains Mono, monospace"});
+    t.textContent = x.r; svg.appendChild(t);
+  });
+  const t0=mk("text",{x:2,y:Y(maxV)+3,fill:"#5C7083","font-size":8,"font-family":"JetBrains Mono, monospace"});
+  t0.textContent = String(Math.round(maxV)); svg.appendChild(t0);
+  const t1=mk("text",{x:2,y:H-15,fill:"#5C7083","font-size":8,"font-family":"JetBrains Mono, monospace"});
+  t1.textContent="0"; svg.appendChild(t1);
+  return svg;
+}
+function leitura(a){
+  const s=a.serie; if(!s.length) return "não entrou em campo e não recebeu programa";
+  const rs = s.map(x=>x.razao);
+  const maxR = Math.max(...rs), minR = Math.min(...rs);
+  const partes=[];
+  if(maxR>1.45) partes.push("razão chegou a "+maxR.toFixed(2)+" — sobrecarga");
+  if(minR<.8) partes.push("razão caiu a "+minR.toFixed(2)+" — chegou destreinada");
+  if(!partes.length) partes.push("razão entre "+minR.toFixed(2)+" e "+maxR.toFixed(2)+" — dose bem administrada");
+  if(a.eventos.length) partes.push(a.eventos.length+" lesão(ões)");
+  return partes.join(" · ");
+}
+function vencedorPartida(){
+  const a=S.j[0], b=S.j[1];
+  if(a.vitorias!==b.vitorias) return {v:a.vitorias>b.vitorias?0:1, crit:"jogos ganhos"};
+  const sa=a.pontos[0]+a.pontos[1], sb=b.pontos[0]+b.pontos[1];
+  if(sa!==sb) return {v:sa>sb?0:1, crit:"saldo de pontos ("+sa+" a "+sb+")"};
+  const la=a.elenco.reduce((s,x)=>s+x.lesao,0), lb=b.elenco.reduce((s,x)=>s+x.lesao,0);
+  if(la!==lb) return {v:la<lb?0:1, crit:"menos pontos de lesão ("+la+" a "+lb+")"};
+  return {v:null, crit:"empate em tudo"};
+}
+
+/* ══════════════════════ CÓDIGO DE RESULTADO ══════════════════════
+   Uma linha de texto que carrega o essencial da partida para o painel da turma.
+   Legível de propósito: se o grupo não conseguir copiar, dá para ditar.
+   Não carrega as curvas — carrega o que o debrief usa, que são os dois erros opostos. */
+const SEP = "|";
+function limpo(s){ return String(s).replace(/[|\n\r]/g," ").trim().slice(0,18) || "Grupo"; }
+function diagnostico(j){
+  let exc = 0, fal = 0, pior = -1, maior = 0;
+  j.elenco.forEach((a,i)=>{
+    if(!a.serie.length) return;
+    const rs = a.serie.map(x=>x.razao);
+    const mx = Math.max(...rs), mn = Math.min(...rs);
+    if(mx > 1.45) exc++;
+    if(mn < .8) fal++;
+    if(mx > maior){ maior = mx; pior = i; }
+  });
+  return {exc, fal, pior, maior,
+          les: j.elenco.reduce((s,a)=>s+a.lesao,0),
+          fora: j.elenco.filter(a=>!disponivel(a)).length};
+}
+function codigoResultado(){
+  const [A,B] = S.j, dA = diagnostico(A), dB = diagnostico(B);
+  return ["DOSE2", limpo(A.nome), limpo(B.nome),
+    A.pontos[0]+"-"+B.pontos[0], A.pontos[1]+"-"+B.pontos[1],
+    dA.les+"-"+dB.les, dA.exc+"-"+dA.fal, dB.exc+"-"+dB.fal,
+    dA.pior+"-"+Math.round(dA.maior*100), dB.pior+"-"+Math.round(dB.maior*100),
+    dA.fora+"-"+dB.fora
+  ].join(SEP);
+}
+function lerCodigo(txt){
+  const p = String(txt).trim().split(SEP);
+  const v2 = p[0]==="DOSE2" && p.length===11;
+  const v1 = p[0]==="DOSE1" && p.length===10;
+  if(!v1 && !v2) return null;
+  const par = (s)=>{ const [a,b] = String(s).split("-").map(Number);
+    return (isFinite(a) && isFinite(b)) ? [a,b] : null; };
+  const j1 = par(p[3]), j2 = par(p[4]), les = par(p[5]);
+  const eA = par(p[6]), eB = par(p[7]), pA = par(p[8]), pB = par(p[9]);
+  const fora = v2 ? par(p[10]) : [0,0];
+  if(!j1 || !j2 || !les || !eA || !eB || !pA || !pB || !fora) return null;
+  const v = (a,b)=>a>b ? 1 : a<b ? 2 : 0;
+  const vit = [0,0];
+  for(const g of [j1,j2]){ const q = v(g[0],g[1]); if(q) vit[q-1]++; }
+  const nome = (i)=>(i>=0 && ATLETAS[i]) ? ATLETAS[i].nm : "—";
+  return {nomes:[p[1],p[2]], j1, j2, vit, les, fora,
+          erros:[{exc:eA[0], fal:eA[1]}, {exc:eB[0], fal:eB[1]}],
+          pior:[{nm:nome(pA[0]), r:pA[1]/100}, {nm:nome(pB[0]), r:pB[1]/100}],
+          bruto:String(txt).trim()};
+}
+/* Uma linha por GRUPO, não por partida — é a unidade em que a decisão foi tomada. */
+function linhasDoPainel(partidas){
+  const L = [];
+  for(const p of partidas) for(let i=0;i<2;i++)
+    L.push({nome:p.nomes[i], exc:p.erros[i].exc, fal:p.erros[i].fal,
+            les:p.les[i], fora:p.fora[i], vit:p.vit[i],
+            pontos:p.j1[i]+p.j2[i], pior:p.pior[i],
+            erros:p.erros[i].exc + p.erros[i].fal});
+  /* ordenado por erro de carga: a tabela vira um gradiente, e o gradiente é a aula */
+  L.sort((a,b)=>a.erros-b.erros || a.les-b.les);
+  return L;
+}
+
+/* ── RELATÓRIO · O QUE VOCÊ PEDIU × O QUE ELAS PAGARAM ───────────────────────
+   Aqui a conta fecha. Durante a partida o grupo só via a carga prescrita e o que
+   tivesse medido. No fim, tudo é revelado — inclusive o fator das atletas que nunca
+   foram medidas, que é onde costuma estar a surpresa. */
+function blocoPSE(){
+  const w = el("div","card stack");
+  w.appendChild(el("h3","","Carga prescrita × carga paga"));
+  w.appendChild(el("p","dim","A razão aguda:crônica de cada atleta foi calculada sobre a coluna "
+    + "da direita. Quem nunca foi medida teve a projeção calculada como se pagasse 1,00× — "
+    + "e a diferença entre as duas colunas é o tamanho do erro que isso produziu."));
+  for(const j of S.j){
+    const medidas = j.elenco.length ? j.elenco[0].pse.filter(x=>x.medida).length : 0;
+    const sec = el("div","stack");
+    sec.appendChild(el("div","lbl", j.nome + " · mediu a PSE em " + medidas + " de "
+      + (j.elenco.length ? j.elenco[0].pse.length : 0) + " rodadas"));
+    const tb = el("table","tab");
+    const hd = el("tr");
+    for(const h of ["Atleta","Prescrito","Pago","Fator médio","Nunca medida"]) hd.appendChild(el("th","",h));
+    tb.appendChild(hd);
+    const linhas = j.elenco.map(a=>{
+      const sp = a.pse.reduce((t,x)=>t+x.presc,0);
+      const sr = a.pse.reduce((t,x)=>t+x.real,0);
+      return {a, sp, sr, f: sp>0 ? sr/sp : 1, cega: a.pseVisto == null};
+    }).sort((x,y)=>y.f-x.f);
+    for(const L of linhas){
+      const tr = el("tr");
+      tr.appendChild(el("td","",L.a.nm));
+      tr.appendChild(el("td","num", nf(Math.round(L.sp*10)/10)));
+      const td = el("td","num psev"); td.textContent = nf(Math.round(L.sr*10)/10);
+      tr.appendChild(td);
+      const tf = el("td","num"); tf.textContent = L.f.toFixed(2)+"×";
+      if(L.f >= 1.12) tf.style.color = "var(--vermelho)";
+      else if(L.f <= 1.02) tf.style.color = "var(--verde)";
+      tr.appendChild(tf);
+      const tc = el("td", "faint", L.cega ? "nunca medida" : "—");
+      if(L.cega) tc.style.color = "var(--ambar)";
+      tr.appendChild(tc);
+      tb.appendChild(tr);
+    }
+    sec.appendChild(tb);
+    const cegas = linhas.filter(L=>L.cega && L.f >= 1.10).map(L=>L.a.nm);
+    if(cegas.length){
+      const al = el("div","aviso");
+      al.innerHTML = "<b>" + cegas.join(", ") + "</b> pagou mais de 1,10× o treino "
+        + "prescrito e nunca foi medida. A projeção que apareceu na tela durante a "
+        + "partida inteira estava otimista para ela.";
+      sec.appendChild(al);
+    } else if(medidas === 0){
+      sec.appendChild(el("div","aviso","Este grupo nunca colheu a PSE. "
+        + "Jogou a partida inteira com a carga prescrita, que é a planilha do treinador — "
+        + "não a resposta das atletas."));
+    }
+    w.appendChild(sec);
+  }
+  w.appendChild(el("p","faint","Pergunta para o debrief: medir custava 1 de energia por rodada, "
+    + "de seis. Quem mediu gastou menos treinando. Compensou? E para quem NÃO compensaria?"));
+  return w;
+}
+
+/* ══════════════════════ TELA · RELATÓRIO ══════════════════════ */
+function telaRelatorio(app){
+  const w = el("div","stack");
+  const res = vencedorPartida();
+  w.appendChild(el("h1","", res.v===null ? "Empate" : S.j[res.v].nome+" venceu"));
+  w.appendChild(el("p","dim","Critério: "+res.crit+"."));
+
+  const pl = el("div","card grid3");
+  for(const j of S.j){
+    const b=el("div"); b.style.textAlign="center";
+    b.appendChild(el("div","lbl", j.nome));
+    const n=el("div","num"); n.style.fontSize="30px"; n.style.fontWeight="700";
+    n.textContent = j.pontos[0]+" · "+j.pontos[1];
+    b.appendChild(n);
+    b.appendChild(el("div","faint","pontos em J1 e J2"));
+    b.appendChild(el("div","faint", j.elenco.reduce((s,x)=>s+x.lesao,0)+" pontos de lesão no elenco"));
+    pl.appendChild(b);
+  }
+  w.appendChild(pl);
+
+  /* leitura automática dos dois erros opostos */
+  const diag = el("div","card stack");
+  diag.appendChild(el("h3","","Os dois erros opostos"));
+  for(const j of S.j){
+    const sobre = j.elenco.filter(a=>a.serie.some(x=>x.razao>1.45));
+    const sub   = j.elenco.filter(a=>a.serie.some(x=>x.razao<.8));
+    const d = el("div");
+    d.appendChild(el("div","lbl", j.nome));
+    const t = el("p","dim");
+    const ps=[];
+    if(sobre.length) ps.push("passaram de 1,45 (sobrecarga): "+sobre.map(a=>a.nm).join(", "));
+    if(sub.length)   ps.push("caíram abaixo de 0,80 (destreinadas): "+sub.map(a=>a.nm).join(", "));
+    if(!ps.length)   ps.push("nenhuma atleta saiu da faixa — dose bem administrada no elenco inteiro");
+    t.textContent = ps.join(" · ");
+    d.appendChild(t);
+    diag.appendChild(d);
+  }
+  const nota = el("p","faint");
+  nota.textContent = "Perguntas para o debrief: quem errou por excesso e quem errou por falta? "
+    + "Alguém venceu sem olhar carga? Que carta vocês não compraram e deveriam? "
+    + "Uma lesão que não aconteceu prova que a dose estava certa?";
+  diag.appendChild(nota);
+  w.appendChild(diag);
+  w.appendChild(blocoPSE());
+
+  /* curvas, lesionadas primeiro */
+  for(const j of S.j){
+    const sec = el("div","stack");
+    sec.appendChild(el("h3","","Curvas de carga · "+j.nome));
+    const ord = j.elenco.slice().sort((a,b)=>
+      (b.eventos.length - a.eventos.length) ||
+      (Math.max(0,...b.serie.map(x=>x.razao)) - Math.max(0,...a.serie.map(x=>x.razao))));
+    const g = el("div","elenco");
+    for(const a of ord){
+      const c = el("div","curva");
+      const top = el("div","row"); top.style.justifyContent="space-between";
+      top.appendChild(el("span","disp",a.nm));
+      const r = razao(a);
+      top.appendChild(el("span","zona z-"+zona(r), rotuloZona(r)));
+      c.appendChild(top);
+      c.appendChild(curvaSVG(a));
+      c.appendChild(el("p","faint",leitura(a)));
+      g.appendChild(c);
+    }
+    sec.appendChild(g);
+    w.appendChild(sec);
+  }
+
+  const lg = el("div","card stack");
+  lg.appendChild(el("h3","","Histórico da partida"));
+  const lb = el("div","logbox");
+  S.log.forEach(l=>{ const d=el("div"); d.appendChild(el("span","lbl",l.r+" ")); d.appendChild(document.createTextNode(l.txt)); lb.appendChild(d); });
+  lg.appendChild(lb);
+  w.appendChild(lg);
+
+  /* código para o painel da turma */
+  const cx = el("div","card stack");
+  cx.style.borderColor = "var(--cyan)";
+  cx.appendChild(el("h3","","Mandar o resultado para o professor"));
+  cx.appendChild(el("p","dim","Copie esta linha e mande para quem está conduzindo a aula. "
+    + "Ela carrega o placar, as lesões e os dois erros opostos de cada grupo."));
+  const cod = codigoResultado();
+  const inp = el("input"); inp.type="text"; inp.value=cod; inp.readOnly=true;
+  inp.style.maxWidth="100%"; inp.style.fontFamily="var(--num)"; inp.style.fontSize="12px";
+  inp.onclick = ()=>inp.select();
+  cx.appendChild(inp);
+  const lr = el("div","row");
+  const bc = el("button","pri","Copiar resultado");
+  bc.onclick = ()=>{
+    inp.select();
+    const ok2 = ()=>{ bc.textContent = "Copiado"; setTimeout(()=>{ bc.textContent = "Copiar resultado"; }, 1800); };
+    if(navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(cod).then(ok2, ()=>{ bc.textContent = "Selecione e copie à mão"; });
+    else bc.textContent = "Selecione e copie à mão";
+  };
+  lr.appendChild(bc);
+  cx.appendChild(lr);
+  w.appendChild(cx);
+
+  const r = el("div","row");
+  const b = el("button","pri","Nova partida"); b.onclick=()=>{ S=null; render(); };
+  r.appendChild(b);
+  const b2 = el("button","ghost","Ver as "+TOTAL_CARTAS+" cartas"); b2.onclick=()=>{ VENDO_CATALOGO=true; render(); };
+  r.appendChild(b2);
+  const b4 = el("button","ghost","Painel da turma"); b4.onclick=()=>{ VENDO_PAINEL=true; render(); };
+  r.appendChild(b4);
+  w.appendChild(r);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ POR QUE CADA CARTA EXISTE ══════════════════════
+   Isto não é sabor. É a ligação entre a mecânica e a ementa, e é o que permite a
+   outro professor conduzir o debrief sem ter desenhado o jogo. */
+const POR_QUE = {
+ forca:"Sobrecarga, princípio 3 da aula 06: progredir exige superar o já tolerado — e isso custa carga.",
+ plio:"Especificidade: potência se treina com potência. É o maior ganho do catálogo e a maior carga.",
+ propri:"Propriocepção é o programa com melhor evidência para prevenção de entorse de tornozelo.",
+ core:"Controle de tronco e pelve. É exatamente o que a ponte unilateral da aula 07 avalia.",
+ ombro:"Esporte overhead. SET e ASH, da aula 07, medem o que este programa treina.",
+ recup:"Recuperação ativa sustenta a crônica sem elevar a aguda — o oposto do repouso absoluto.",
+ sono:"O fator de recuperação com maior efeito e nenhum custo de carga. Barato e quase sempre esquecido.",
+ nutri:"Disponibilidade energética, o eixo da RED-S: déficit crônico termina em fratura por estresse.",
+ descarga:"O corretivo de sobrecarga, e a carta com a lição mais fina do baralho. O piso em 1,00: ela "
+   +"devolve à dose certa e nunca leva abaixo dela — nenhuma carta zera a carga, porque carga aplicada não "
+   +"se desfaz; o que a recuperação acelera é o decaimento da fadiga. E o preço: a atleta chega ao jogo 2 "
+   +"menos afiada. Dá para salvar uma rampa mal feita, mas você entra em quadra pior do que se tivesse "
+   +"dosado certo desde o começo.",
+ tatatq:"Treino tático de grupo. Na vida real o time treina junto, e é assim que a maior parte do "
+   +"volume chega: por isso esta carta pega TODAS as atacantes e você não escolhe quem. O perigo é "
+   +"que ela soma por cima do coletivo — quem já estava no limite estoura, e normalmente é a mais nova.",
+ tatdef:"O mesmo do lado da defesa. Treino de grupo é eficiente e é o certo na maior parte do tempo; "
+   +"o erro clássico não é treinar o grupo, é empilhar trabalho individual por cima do grupo em quem "
+   +"não precisava.",
+ aquecimento:"Aquecimento específico é a intervenção preventiva com melhor custo-benefício que existe: "
+   +"barata, rápida e de alcance amplo. Por isso é carta de X sem custo de base — cobrir o time todo é "
+   +"exatamente o que se faz com ela na vida real.",
+ coletivo:"A carta que ensina sozinha por que prescrição uniforme é perigosa. Ela dá a MESMA carga às doze, "
+   +"e as doze têm crônicas diferentes: o que é dose certa para a Marina destrói a Camila na mesma jogada. "
+   +"Não é armadilha, porque as zonas estão à vista — é teste de leitura.",
+ crio:"PEACE: crioterapia alivia, não reconstrói. Barata de propósito — e insuficiente de propósito.",
+ fisio:"Reabilitação ativa. Carga é o remédio; custa mais energia porque faz mais pelo tecido.",
+ reab:"A alta não é ausência de dor, é capacidade de suportar tensão. É a carta mais cara por isso.",
+ peace:"PEACE & LOVE substituiu o RICE: proteger, elevar, evitar anti-inflamatório de rotina, carga ótima.",
+ banda:"Bandagem funcional dá restrição mecânica e confiança. Não cura nada, e a carta não cura nada.",
+ imediato:"Atendimento imediato: a janela estreita em que a conduta ainda muda o desfecho.",
+ teste:"Teste funcional monitora, não prediz. Aqui ele só revela informação — que é o que ele faz mesmo.",
+ tempo:"Reduzir a demanda é uma das duas saídas do modelo capacidade × demanda. A outra é treinar.",
+ troca:"Substituir é conduta. Tirar a atleta da quadra é intervenção, não desistência.",
+ invasao:"O trauma agudo do vôlei: pisar no pé de quem aterrissa. O entorse acontece — isso é agudo, não é carga. "
+       + "Quem decide se ela perde um jogo ou três é a preparação dela: propriocepção é o programa com melhor "
+       + "evidência contra entorse de tornozelo, e aqui ela segura um ponto de lesão de verdade.",
+ calend:"Congestão de calendário é o risco característico do período competitivo, na aula 06.",
+ viagem:"Viagem e privação de sono elevam a carga interna sem mudar nada na carga externa.",
+ scout:"Informação custa. Saber a razão do elenco adversário é a única forma de mirar bem.",
+ diretoria:"Pedir emprestado hoje e pagar amanhã é o que a pressão por resultado faz com a carga.",
+ acelerado:"Elevar o ritmo eleva a demanda do gesto — e a demanda é metade da equação da lesão.",
+ saque:"Aumentar a demanda imposta. Você não machuca ninguém: só expõe quem não tem capacidade.",
+};
+
+/* ══════════════════════ TELA · PAINEL DA TURMA ══════════════════════
+   Para projetar no fim da aula. Junta os códigos das partidas que rodaram em paralelo
+   e mostra a tabela e, mais importante, a conta dos dois erros opostos da turma inteira.
+   Guarda no navegador de quem está conduzindo — é conveniência de um aparelho só, e
+   por isso toda leitura e escrita vai dentro de try/catch. */
+const CHAVE_PAINEL = "dose.painel.v1";
+function lerPainel(){
+  try { const s = localStorage.getItem(CHAVE_PAINEL); return s ? JSON.parse(s) : []; }
+  catch(e){ return []; }
+}
+function gravarPainel(lista){
+  try { localStorage.setItem(CHAVE_PAINEL, JSON.stringify(lista)); } catch(e){}
+}
+function telaPainel(app){
+  const w = el("div","stack"); w.style.paddingTop="18px";
+  const topo = el("div","row"); topo.style.justifyContent="space-between";
+  const tt = el("div");
+  tt.appendChild(el("h1","","Painel da turma"));
+  tt.appendChild(el("p","dim","Cole aqui o código que cada mesa gerou no fim da partida."));
+  topo.appendChild(tt);
+  const bv = el("button","pri","Voltar");
+  bv.onclick = ()=>{ VENDO_PAINEL=false; render(); };
+  topo.appendChild(bv);
+  w.appendChild(topo);
+
+  const guardados = lerPainel();
+  const partidas = guardados.map(lerCodigo).filter(Boolean);
+
+  const entrada = el("div","card stack");
+  entrada.appendChild(el("div","lbl","Colar código — um por linha"));
+  const ta = document.createElement("textarea");
+  ta.rows = 3; ta.placeholder = "DOSE1|Grupo A|Grupo B|...";
+  ta.style.cssText = "width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--fg);"
+    + "border-radius:4px;padding:9px 11px;font-family:var(--num);font-size:12px;resize:vertical";
+  entrada.appendChild(ta);
+  const msg = el("div","faint");
+  const lr = el("div","row");
+  const ba = el("button","pri","Adicionar");
+  ba.onclick = ()=>{
+    const linhas = ta.value.split("\n").map(s=>s.trim()).filter(Boolean);
+    let bons = 0, ruins = 0;
+    const atual = lerPainel();
+    for(const l of linhas){
+      if(lerCodigo(l)){ if(!atual.includes(l)){ atual.push(l); bons++; } } else ruins++;
+    }
+    gravarPainel(atual);
+    if(ruins) msg.textContent = ruins + " linha(s) não eram código válido e foram ignoradas.";
+    ta.value = "";
+    render();
+  };
+  lr.appendChild(ba);
+  if(partidas.length){
+    const bl = el("button","danger","Limpar o painel");
+    bl.onclick = ()=>{ if(confirm("Apagar as "+partidas.length+" partidas do painel?")){ gravarPainel([]); render(); } };
+    lr.appendChild(bl);
+  }
+  entrada.appendChild(lr);
+  entrada.appendChild(msg);
+  w.appendChild(entrada);
+
+  if(!partidas.length){
+    const v = el("div","aviso");
+    v.textContent = "Nenhuma partida ainda. Cada mesa gera o código no fim, na tela de relatório, "
+      + "no botão Copiar resultado.";
+    w.appendChild(v);
+    app.appendChild(w);
+    return;
+  }
+
+  /* ── tabela por GRUPO, anônima por padrão ──────────────────────────────
+     A regra: cada grupo reconhece a própria linha, e ninguém reconhece a dos outros.
+     Ordenada por erro de carga, a tabela vira um gradiente — e o gradiente é a aula,
+     porque mostra o peso da decisão descendo até o resultado sem acusar ninguém. */
+  const linhas = linhasDoPainel(partidas);
+  const ct = el("div","card stack");
+  ct.style.borderColor = "var(--cyan)";
+  const ch = el("div","row"); ch.style.justifyContent="space-between";
+  const ch1 = el("div");
+  ch1.appendChild(el("h2","","O peso das decisões"));
+  ch1.appendChild(el("p","dim","Uma linha por grupo, da menor para a maior quantidade de erro de carga."));
+  ch.appendChild(ch1);
+  const bn = el("button", PAINEL_NOMES ? "danger" : "ghost",
+    PAINEL_NOMES ? "Ocultar os nomes" : "Mostrar os nomes");
+  bn.title = PAINEL_NOMES ? "Volte a ocultar antes de projetar" : "Só para o seu uso, fora da projeção";
+  bn.onclick = ()=>{ PAINEL_NOMES = !PAINEL_NOMES; render(); };
+  ch.appendChild(bn);
+  ct.appendChild(ch);
+
+  const tw = el("div","tw"); const tb = el("table");
+  const cab = el("tr");
+  for(const h of [PAINEL_NOMES?"Grupo":"", "Erro de carga", "→ Lesões", "→ Atletas perdidas", "→ Jogos ganhos"])
+    cab.appendChild(el("th","",h));
+  tb.appendChild(cab);
+  for(const g of linhas){
+    const tr = el("tr");
+    const td0 = el("td");
+    if(PAINEL_NOMES) td0.textContent = g.nome;
+    else {
+      const barra = el("span","", "▌".repeat(Math.max(1, Math.min(6, g.erros || 1))));
+      barra.style.color = g.erros ? "var(--ambar)" : "var(--verde)";
+      barra.style.fontFamily = "var(--num)";
+      td0.appendChild(barra);
+    }
+    tr.appendChild(td0);
+
+    const te = el("td");
+    if(!g.erros){ te.textContent = "nenhum"; te.style.color = "var(--verde)"; }
+    else {
+      const partes = [];
+      if(g.exc) partes.push(g.exc + " por EXCESSO");
+      if(g.fal) partes.push(g.fal + " por FALTA");
+      te.textContent = partes.join(" · ");
+      te.style.color = "var(--ambar)";
+    }
+    tr.appendChild(te);
+
+    const tl = el("td","", String(g.les));
+    if(g.les >= 4) tl.style.color = "var(--vermelho)";
+    tr.appendChild(tl);
+    const tf = el("td","", String(g.fora));
+    if(g.fora) tf.style.color = "var(--vermelho)";
+    tr.appendChild(tf);
+    const tv = el("td","", g.vit + (g.vit===1?" jogo":" jogos"));
+    tv.style.color = g.vit>=2 ? "var(--cyan)" : g.vit===0 ? "var(--faint)" : "var(--fg)";
+    tr.appendChild(tv);
+    tb.appendChild(tr);
+  }
+  tw.appendChild(tb);
+  ct.appendChild(tw);
+  const nn = el("p","faint");
+  nn.textContent = PAINEL_NOMES
+    ? "Os nomes estão à mostra. Oculte antes de projetar."
+    : "Sem nomes de propósito: cada grupo reconhece a própria linha, e ninguém reconhece a dos outros. "
+      + "O que está em julgamento é a decisão, não o grupo.";
+  ct.appendChild(nn);
+  w.appendChild(ct);
+
+  /* ── a conta da turma ────────────────────────────────────────────────── */
+  let exc=0, fal=0, les=0, fora=0, piorNome="—", piorR=0;
+  for(const g of linhas){
+    exc += g.exc; fal += g.fal; les += g.les; fora += g.fora;
+    if(g.pior.r > piorR){ piorR = g.pior.r; piorNome = g.pior.nm; }
+  }
+  const grupos = linhas.length, total = grupos * ATLETAS.length;
+  const cs = el("div","card stack");
+  cs.appendChild(el("h2","","A turma inteira"));
+  const g3 = el("div","grid3");
+  const bloco = (v, rot, cor)=>{
+    const d = el("div"); d.style.textAlign="center";
+    const n = el("div","num"); n.style.fontSize="40px"; n.style.fontWeight="700";
+    n.style.lineHeight="1"; n.style.color=cor||"var(--fg)"; n.textContent=String(v);
+    d.appendChild(n); d.appendChild(el("div","lbl",rot)); return d;
+  };
+  g3.appendChild(bloco(total, grupos+" grupos · atletas administradas"));
+  g3.appendChild(bloco(exc, "passaram de 1,45 — erro por EXCESSO", "var(--vermelho)"));
+  g3.appendChild(bloco(fal, "caíram de 0,80 — erro por FALTA", "var(--ambar)"));
+  g3.appendChild(bloco(les, "pontos de lesão somados", "var(--vermelho)"));
+  cs.appendChild(g3);
+
+  /* o elo entre erro e resultado, se os dados deixarem */
+  if(grupos >= 4){
+    const metade = Math.floor(grupos/2);
+    const bons = linhas.slice(0, metade), ruins = linhas.slice(-metade);
+    const vb = bons.reduce((s,g)=>s+g.vit,0), vr = ruins.reduce((s,g)=>s+g.vit,0);
+    const lb = bons.reduce((s,g)=>s+g.les,0), lr = ruins.reduce((s,g)=>s+g.les,0);
+    const el2 = el("div","conselho");
+    el2.appendChild(el("div","lbl","no campeonato"));
+    el2.appendChild(document.createTextNode(
+      "Os "+metade+" grupos que dosaram melhor somaram "+vb+" vitória(s) e "+lb+" ponto(s) de lesão. "
+      + "Os "+metade+" que dosaram pior somaram "+vr+" e "+lr+". "
+      + (vb>vr ? "Dosar certo ganhou jogo nesta turma."
+         : vb<vr ? "Nesta turma, quem dosou pior ganhou mais — vale perguntar à sala por que, e se dá para contar com isso de novo."
+         : "Ficou empatado em vitórias, e aí a pergunta é qual elenco chegaria inteiro a um terceiro jogo.")));
+    cs.appendChild(el2);
+  }
+  const leit = el("p","");
+  leit.innerHTML = exc > fal
+    ? "A turma errou mais <b>por excesso</b> ("+exc+" contra "+fal+"). Pergunta para abrir o debrief: "
+      + "o que vocês estavam tentando ganhar quando subiram a carga?"
+    : exc < fal
+    ? "A turma errou mais <b>por falta</b> ("+fal+" contra "+exc+"). Pergunta para abrir o debrief: "
+      + "quem vocês deixaram de treinar, e por que acharam que estavam protegendo essa atleta?"
+    : "A turma errou igualmente <b>por excesso e por falta</b> ("+exc+" de cada). "
+      + "É a curva em U inteira numa sala só.";
+  cs.appendChild(leit);
+  cs.appendChild(el("p","faint","Pior caso da turma: "+piorNome+" chegou a "+piorR.toFixed(2)+". "
+    + "E uma lesão que não aconteceu não prova que a dose estava certa — olhem as zonas, não o desfecho."));
+  w.appendChild(cs);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ TELA · REGRAS ══════════════════════
+   O manual inteiro numa tela, com os números vindos das constantes — assim ele não
+   envelhece quando o equilíbrio mudar. */
+function telaRegras(app){
+  const w = el("div","stack"); w.style.paddingTop="18px";
+  const topo = el("div","row"); topo.style.justifyContent="space-between";
+  const tt = el("div");
+  tt.appendChild(el("h1","","Regras"));
+  tt.appendChild(el("p","dim","Dá para jogar sem ler: a faixa azul no topo de cada tela diz o que fazer. "
+    + "Isto aqui é para quando você quiser entender por quê."));
+  topo.appendChild(tt);
+  const bv = el("button","pri", S ? "Voltar à partida" : "Voltar");
+  bv.onclick = ()=>{ VENDO_REGRAS=false; render(); };
+  topo.appendChild(bv);
+  w.appendChild(topo);
+
+  const sec = (titulo, blocos)=>{
+    const c = el("div","card stack");
+    c.appendChild(el("h2","",titulo));
+    for(const x of blocos){
+      if(typeof x === "string"){ const p = el("p",""); p.innerHTML = x; c.appendChild(p); }
+      else c.appendChild(x);
+    }
+    w.appendChild(c);
+    return c;
+  };
+  const tabela = (cab, linhas)=>{
+    const d = el("div","tw"); const tb = el("table");
+    const tr = el("tr"); for(const h of cab) tr.appendChild(el("th","",h));
+    tb.appendChild(tr);
+    for(const l of linhas){
+      const r = el("tr");
+      for(const cel of l){
+        const td = el("td");
+        if(cel && cel.nodeType) td.appendChild(cel); else td.innerHTML = cel;
+        r.appendChild(td);
+      }
+      tb.appendChild(r);
+    }
+    d.appendChild(tb); return d;
+  };
+
+  const ouro = sec("O que decide tudo", [
+    "<b>Nenhuma carta escreve lesão.</b> A lesão é sempre consequência de carga mal administrada "
+    + "ou de demanda acima da capacidade. Treinar demais machuca; treinar de menos machuca igual.",
+    "Por isso <b>vencer o jogo e acertar a prescrição são a mesma coisa</b>. Não existe atalho que "
+    + "dispense ler carga."]);
+  ouro.style.borderColor = "var(--cyan)";
+
+  sec("O elenco", [
+    "Os dois grupos recebem <b>as mesmas " + ATLETAS.length + " jogadoras</b>, com os mesmos nomes e os mesmos "
+    + "números. Não há sorteio de elenco: toda diferença de resultado vem da decisão de vocês.",
+    "Cada uma tem uma <b>crônica inicial</b> — a carga a que o corpo dela já está adaptado. É ela que "
+    + "define de quanto treino aquela atleta precisa, e é diferente para cada uma. <b>Não existe dose "
+    + "boa em abstrato.</b>"]);
+
+  const zonas = el("div","row");
+  for(const [r,rot] of [[.6,"destreinada"],[1.0,"dose certa"],[1.35,"atenção"],[1.7,"sobrecarga"]])
+    zonas.appendChild(el("span","zona z-"+zona(r), rot));
+  sec("Carga — a conta que decide tudo", [
+    "<b>Todas treinam junto.</b> Toda atleta recebe <b>" + CARGA_COLETIVA + " de carga por rodada</b> de graça, "
+    + "sem carta nenhuma. Os programas são trabalho <b>individual por cima disso</b>.",
+    "O jogo compara a carga das <b>2 últimas rodadas</b> (aguda) com a média das <b>6 últimas</b> (crônica). "
+    + "Essa razão coloca cada atleta numa de quatro zonas:",
+    zonas,
+    "As duas pontas machucam. Quem treinou de menos chega frágil; quem subiu rápido demais chega "
+    + "exposta. O meio é onde você quer todo mundo no dia de jogo.",
+    "<b>Lesão também acontece treinando</b>, não só em jogo — o risco por rodada de treino é cerca de "
+    + "um terço do risco de um duelo, mas são " + SEQ.filter(s=>s.k==="T").length + " rodadas de treino para "
+    + SEQ.filter(s=>s.k==="J").length + " jogos."]);
+
+  const psec = sec("Carga interna — o que você pede não é o que ela paga", [
+    "O número de carga que aparece na carta da atleta é a <b>carga prescrita</b>: o que você pediu. "
+    + "O que entra na conta da razão aguda:crônica é a <b>carga interna</b> — o que aquele treino "
+    + "custou ao corpo dela.",
+    "As duas não são iguais, e a diferença muda de atleta para atleta e de semana para semana. "
+    + "Sobe com <b>viagem</b> e com <b>lesão recente</b>; desce com <b>sono</b> e com "
+    + "<b>disponibilidade energética</b>, que além de baratear deixam a resposta mais previsível.",
+    "Para saber, você <b>pergunta</b>: o botão <b>colher a PSE da sessão</b> custa " + PSE_CUSTO
+    + " de energia e revela, naquela rodada, quanto cada atleta pagou de verdade.",
+    "<b>Repare no que medir não faz.</b> Não corrige nada. A energia que você gastou medindo saiu do "
+    + "treino, e depois de medir você ainda precisa gastar para ajustar. Monitorar não previne — "
+    + "monitorar diz quando intervir.",
+    "<b>E enquanto você não mede, o jogo supõe 1,00×.</b> A linha \"no J1\" de cada atleta é calculada "
+    + "com o último fator que você mediu, ou com 1,00 se nunca mediu. Quem não mede projeta errado, "
+    + "e erra sempre para o mesmo lado: otimista."]);
+  psec.style.borderColor = "var(--cyan)";
+
+  sec("As duas moedas", [
+    tabela(["Moeda","Quanto","Para quê"], [
+      ["<b>Verba</b>", VERBA_PRE, "Só na pré-temporada. Compra estrutura, não jogadoras: instala os programas iniciais."],
+      ["<b>Energia</b>", ENERGIA_BASE + " por rodada", "Paga cartas e a manutenção dos programas. <b>Não acumula</b> — o que sobra se perde."]]),
+    "Manutenção é <b>1 de energia a cada 3 programas instalados</b>. Instalar mais do que você consegue "
+    + "manter faz o programa cair e o ganho se perder, que é reversibilidade."]);
+
+  const seq = el("div","tl");
+  SEQ.forEach(s=>{ const i = el("i","",s.r); if(s.k==="J") i.classList.add("jogo"); seq.appendChild(i); });
+  sec("A partida", [
+    seq,
+    "Pré-temporada, três rodadas de treino, <b>JOGO 1</b>, mais três rodadas, <b>JOGO 2</b>. "
+    + "Trinta a quarenta minutos.",
+    "Em cada rodada de treino viram <b>" + MERCADO_VIRADAS + " cartas para cima</b> no mercado e os grupos levam "
+    + "<b>" + ESCOLHAS + " cada</b>, escolhendo um por vez, alternando. Está tudo à vista: a sorte é a mesma "
+    + "para os dois, e o que sobra de diferença é escolha. Limite de mão: " + LIMITE_MAO + ".",
+    "Quem <b>perde</b> um jogo recebe " + ENERGIA_PERDEDOR + " de energia em vez de " + ENERGIA_BASE
+    + " e passa a escolher primeiro no mercado. É acesso, não volume — volume demais empurraria o "
+    + "perdedor justamente para o erro que o jogo pune."]);
+
+  sec("O dia de jogo", [
+    "Cada grupo monta a quadra <b>em segredo</b>. São seis posições e <b>cada uma pede uma função</b>:",
+    tabela(["Posição","Pede"], QUADRA.map(s=>[s.nm, s.pede])),
+    "Escalar fora da função é <b>improviso</b>: −2 de atributo e +8 p.p. de risco. Líbero escalada na "
+    + "rede custa −4 e +15 p.p., porque no vôlei ela nem pode atacar de cima.",
+    "Improvisar é decisão legítima — às vezes é melhor que escalar uma titular sobrecarregada. "
+    + "<b>Escolher qual risco correr é a decisão da disciplina.</b>",
+    "Revelação simultânea. Sua rede ataca o fundo adversário <b>na diagonal</b>, como um ataque cruzado. "
+    + "Seis duelos, um por posição. Em cada um, a <b>demanda</b> do ataque contra a <b>capacidade</b> da "
+    + "defesa: a diferença vira chance de ponto e chance de lesão, e as duas aparecem <b>antes</b> de "
+    + "você confirmar.",
+    "<b>Risco é probabilidade, não destino.</b> Razão 1,8 não garante lesão, e ninguém se machucar não "
+    + "prova que a dose estava certa."]);
+
+  sec("Como se ganha", [
+    "Vence quem ganhar mais jogos. Empate em jogos se decide por <b>saldo de pontos</b> e, se persistir, "
+    + "por <b>menos pontos de lesão no elenco</b> — o time que chegou inteiro ao fim.",
+    "Atleta com <b>3 de lesão</b> está fora e não pode ser escalada."]);
+
+  const prof = sec("Para quem está conduzindo a atividade", [
+    "Ao fim da partida o jogo entrega um relatório projetável: a curva de carga aguda e crônica de "
+    + "cada atleta nas oito rodadas, a lesão marcada no ponto exato em que aconteceu, a probabilidade "
+    + "que o aluno aceitou em cada duelo, e a leitura automática dos dois erros opostos.",
+    "Quatro perguntas que funcionam no debrief: <b>quem errou por excesso e quem errou por falta? "
+    + "Alguém venceu sem olhar carga? Que carta vocês não compraram e deveriam? Uma lesão que não "
+    + "aconteceu prova que a dose estava certa?</b>"]);
+  prof.style.borderColor = "var(--verde)";
+
+  const r = el("div","row");
+  const b1 = el("button","pri", S ? "Voltar à partida" : "Voltar");
+  b1.onclick = ()=>{ VENDO_REGRAS=false; render(); };
+  r.appendChild(b1);
+  const b2 = el("button","ghost","Ver as "+TOTAL_CARTAS+" cartas");
+  b2.onclick = ()=>{ VENDO_REGRAS=false; VENDO_CATALOGO=true; render(); };
+  r.appendChild(b2);
+  w.appendChild(r);
+  app.appendChild(w);
+}
+
+/* ══════════════════════ TELA · CATÁLOGO ══════════════════════ */
+function telaCatalogo(app){
+  const w = el("div","stack"); w.style.paddingTop="18px";
+  const top = el("div","row"); top.style.justifyContent="space-between";
+  const tt = el("div");
+  tt.appendChild(el("h1","","As "+TOTAL_CARTAS+" cartas"));
+  tt.appendChild(el("p","dim",ATLETAS.length+" jogadoras idênticas para os dois lados · "
+    + ACOES.length + " cartas de ação em " + TOTAL_DECK + " físicas"));
+  top.appendChild(tt);
+  const bb = el("button","pri", S ? "Voltar à partida" : "Voltar");
+  bb.onclick = ()=>{ VENDO_CATALOGO=false; render(); };
+  top.appendChild(bb);
+  w.appendChild(top);
+
+  const leg = el("div","grid3");
+  [["O número grande","É o atributo em jogo: ataque nas atacantes, defesa nas defensoras. Já desconta fadiga e lesão."],
+   ["Crônica inicial","A carga a que ela já está adaptada. Define a margem que ela tem para treinar — a estrela chega com pouca."],
+   ["Cópias no monte","3× é base e aparece sempre; 1× é rara. O canto esquerdo de cada carta mostra quantas existem."]
+  ].forEach(([t,x])=>{
+    const c = el("div","card");
+    c.appendChild(el("div","lbl",t));
+    c.appendChild(el("p","dim",x));
+    leg.appendChild(c);
+  });
+  w.appendChild(leg);
+
+  for(const pos of ["ATQ","DEF"]){
+    const sec = el("div","stack");
+    sec.appendChild(el("h2","", pos==="ATQ" ? "Seis atacantes" : "Seis defensoras"));
+    const g = el("div","elenco");
+    for(const c of ATLETAS.filter(a=>a.pos===pos))
+      g.appendChild(cartaAtleta(instancia(c.id),{mostraRazao:true, mostraCro:true, hab:true}));
+    sec.appendChild(g);
+    w.appendChild(sec);
+  }
+
+  const comPorque = (id)=>{
+    const box = el("div","stack"); box.style.gap="0";
+    box.appendChild(cartaAcao(id,{copias:true}));
+    const p = el("div","", POR_QUE[id] || "");
+    p.style.fontSize="11.5px"; p.style.color="var(--dim)"; p.style.lineHeight="1.4";
+    p.style.borderLeft="2px solid var(--line)"; p.style.padding="7px 9px"; p.style.marginTop="5px";
+    box.appendChild(p);
+    return box;
+  };
+  for(const [t,rot] of [["PROGRAMA","Programas — ficam em jogo e cobram manutenção"],
+                        ["CONDUTA","Condutas — efeito único"],
+                        ["CONTEXTO","Contexto — o mundo fora da quadra"]]){
+    const sec = el("div","stack");
+    sec.appendChild(el("h2","",rot));
+    const g = el("div","mao");
+    for(const c of ACOES.filter(x=>x.t===t)) g.appendChild(comPorque(c.id));
+    sec.appendChild(g);
+    w.appendChild(sec);
+  }
+
+  const ouro = el("div","card stack");
+  ouro.style.borderColor = "var(--cyan)";
+  ouro.appendChild(el("h2","","A regra de ouro"));
+  const p = el("p","");
+  p.textContent = "Lesão é sempre consequência, nunca jogada. Nenhuma destas cartas escreve lesão "
+    + "diretamente. A Invasão na linha central é a única exceção aparente, e não é: o entorse por "
+    + "aterrissar no pé da adversária é TRAUMA, e trauma agudo acontece mesmo com tudo certo. O que a "
+    + "carga e a propriocepção decidem é a gravidade, não o evento — é o contínuo agudo × overuse da "
+    + "aula 01. Todo o resto da lesão no jogo é saída do motor de carga e de capacidade × demanda.";
+  ouro.appendChild(p);
+  w.appendChild(ouro);
+  app.appendChild(w);
+}
+
+function start(){ render(); }
+start();
+</script>
+
+</body>
+</html>
